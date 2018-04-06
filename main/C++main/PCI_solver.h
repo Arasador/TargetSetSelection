@@ -145,7 +145,7 @@ void PCI_solver::startAlg(int _option) {
 
 // what we need done by the end of the algorithm
 void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
-	objective_value += cplex.getObjValue();
+	objective_value += (int) (cplex.getObjValue() + 0.5);
 	gap = max(cplex.getMIPRelativeGap(), gap);
 	times += cplex.getTime();
 
