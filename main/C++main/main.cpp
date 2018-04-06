@@ -2,11 +2,13 @@
 #include <queue>
 #include <deque>
 #include <stack>
-#include <string>
+
 #include <iostream>
 #include <fstream>
 #include <ilcplex/ilocplex.h>
 #include "PCI_solver.h"
+#include "preprocessing.cpp"
+
 
 #define NUM_MODELS 7
 #define TIMELIMIT 300
@@ -61,30 +63,30 @@ int main (int argc, char** argv) {
     exit(0);
   }
   // reads input file and stores it into components vector
-  deque<vector<vector<int> > > components;
-  read_data(argv[2], components);
+  deque<vector<vector<int> > > components = data_preprocessing(argc, argv);
+  cout << "here" << endl;
+  for (int i = 0; i < components.size(); i ++)
+    print_matrix(components[i], "adj 1: ");
+  //exit(0);
   // possible selected models
   int models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
     S_SMALLER_H1, S_SMALLER_H2};
   vector<int> objective_values(NUM_MODELS, 0);
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
   for (int i = 0; i < components.size(); i ++) {
-    // for each component runs the model
-    //print_matrix(components[i], "Components: \n");
-    // reads data from component vector
     vector<vector<int> > adjacency_list = components[i];
-    vector<int> f  = adjacency_list[adjacency_list.size() - 2];
-    vector<int> w  = adjacency_list[adjacency_list.size() - 1];
+    vector<int> f = adjacency_list[adjacency_list.size() - 2];
+    vector<int> w = adjacency_list[adjacency_list.size() - 1];
     adjacency_list.pop_back();
     adjacency_list.pop_back();
-    components.pop_front();
+
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0')
         continue;
       IloEnv env_pci;
       PCI_solver pci_solver(env_pci, adjacency_list, f, w);
-      pci_solver.setCplexSettings(TIMELIMIT);//vlDisp, vlEmph, alg, numThreads, vlGap, memory);
       pci_solver.setModelProblem();
+      pci_solver.setCplexSettings(TIMELIMIT);//vlDisp, vlEmph, alg, numThreads, vlGap, memory);
       try {
         pci_solver.startAlg(models[i]);
         //one_cut.enforceIntVars();
@@ -95,10 +97,9 @@ int main (int argc, char** argv) {
       }
     }
   }
-
   cout << "objective values are the same? -" << endl;
-  for (int i = 0; i < objective_values.size() - 1; i ++)
-    assert(objective_values[i] == objective_values[i + 1]);
+  //for (int i = 0; i < objective_values.size() - 1; i ++)
+    //assert(objective_values[i] == objective_values[i + 1]);
   write_output_file(objective_values, times, gaps, argv[1], argv[2],
     "table_COLORED.dat");
 }
