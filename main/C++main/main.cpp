@@ -16,7 +16,7 @@
 using namespace std;
 
 // reads data already preprocessed
-void read_data (string filename, deque<vector<vector<int> > > &components) {
+/*void read_data (string filename, deque<vector<vector<int> > > &components) {
   int N, M, C, u, v;
   ifstream myfile (filename.c_str());
   if (! myfile.is_open()) {
@@ -41,8 +41,9 @@ void read_data (string filename, deque<vector<vector<int> > > &components) {
     adjacency_list.push_back(w);
     components.push_back(adjacency_list);
    }
-}
+}//*/
 
+// given solutions, writes results in a file
 void write_output_file (vector<int> objective_values, vector<double> times,
   vector<double> gaps, string selected_models, string filename, string outname) {
   ofstream outfile(outname, ios::app);
@@ -64,9 +65,8 @@ int main (int argc, char** argv) {
   }
   // reads input file and stores it into components vector
   deque<vector<vector<int> > > components = data_preprocessing(argc, argv);
-  cout << "here" << endl;
-  for (int i = 0; i < components.size(); i ++)
-    print_matrix(components[i], "adj 1: ");
+  //for (int i = 0; i < components.size(); i ++)
+    //print_matrix(components[i], "adj 1: ");
   //exit(0);
   // possible selected models
   int models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
@@ -75,29 +75,31 @@ int main (int argc, char** argv) {
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
   for (int i = 0; i < components.size(); i ++) {
     vector<vector<int> > adjacency_list = components[i];
-    vector<int> f = adjacency_list[adjacency_list.size() - 2];
-    vector<int> w = adjacency_list[adjacency_list.size() - 1];
+    vector<int> f = adjacency_list[adjacency_list.size() - 2]; 
+    vector<int> w = adjacency_list[adjacency_list.size() - 1]; 
     adjacency_list.pop_back();
     adjacency_list.pop_back();
-
+    
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0')
         continue;
       IloEnv env_pci;
-      PCI_solver pci_solver(env_pci, adjacency_list, f, w);
+      PCI_solver pci_solver(env_pci, adjacency_list, f, w);  
       pci_solver.setModelProblem();
-      pci_solver.setCplexSettings(TIMELIMIT);//vlDisp, vlEmph, alg, numThreads, vlGap, memory);
+      pci_solver.setCplexSettings(TIMELIMIT);
+      //vlDisp, vlEmph, alg, numThreads, vlGap, memory);
       try {
         pci_solver.startAlg(models[i]);
         //one_cut.enforceIntVars();
         pci_solver.solveProblem();
         pci_solver.endAlg(objective_values[i], times[i], gaps[i]);
+        print_vector(objective_values, "obj values");
       } catch (IloException& ex) {
         pci_solver.Texception();
       }
     }
   }
-  cout << "objective values are the same? -" << endl;
+  //cout << "objective values are the same? -" << endl;
   //for (int i = 0; i < objective_values.size() - 1; i ++)
     //assert(objective_values[i] == objective_values[i + 1]);
   write_output_file(objective_values, times, gaps, argv[1], argv[2],

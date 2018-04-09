@@ -1,9 +1,8 @@
-#include<iostream>
-#include<string>
-#include<vector>
-#include<algorithm>
-#include<assert.h>
-//#include"One_S_cut.h"
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <assert.h>
 #include <ilcplex/ilocplex.h>
 #include "S_cutter.h"
 
@@ -11,14 +10,13 @@ using namespace std;
 
 class PCI_solver {
   public:
-		bool rlModel;
+		//bool rlModel;
 	  vector<vector<int> > adjacency_list;
 	  vector<vector<bool> > adjacency_matrix;
 	  vector<int> f, w;
 	  int N, M, option, constraints_counter;
 		IloNum start_time;
 	  //int initial_ub; //initial lower bound (cost of a valid tour)
-
 	  IloEnv env;
 		IloModel model;
 		IloCplex cplex;
@@ -28,29 +26,30 @@ class PCI_solver {
 		S_cutter* s_cutter;
 	  //IloNum root;
 	  //IloNum ub;
-
-
-	IloObjective objective_function;
-	IloRangeArray constraints;
-  PCI_solver (IloEnv _env, vector<vector<int> > _adjacency_list, vector<int> _f,
-  vector<int> _w);
-  ~PCI_solver ();
-  virtual int setModelProblem ();
-	virtual int solveProblem ();
-  virtual IloExpr create_expression (vector<bool>);
-  void setCplexSettings(int timelimit);
-  void startAlg(int _option);
-  void endAlg(int &objective_value, double &times, double &gap);
-  void Texception();
-  void initial_constraints_v_infection(int initial_v);
+  	IloObjective objective_function;
+  	IloRangeArray constraints;
+    // ----------------------methods
+    PCI_solver (IloEnv _env, vector<vector<int> > _adjacency_list, vector<int>
+      _f, vector<int> _w);
+    ~PCI_solver ();
+    virtual int setModelProblem ();
+  	virtual int solveProblem ();
+    virtual IloExpr create_expression (vector<bool>);
+    void setCplexSettings (int timelimit);
+    void startAlg (int _option);
+    void endAlg (int &objective_value, double &times, double &gap);
+    void Texception ();
+    void initial_constraints_v_infection (int initial_v);
 };
 
+//--------------- Constructor
 PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
 	vector<int> _f, vector<int> _w) {
+  // initializes cplex enviroment and model
   env = _env;
   model = IloModel(_env);
   cplex = IloCplex(model);
-  rlModel = false;
+  //rlModel = false;
   adjacency_list = _adjacency_list;
   f = _f;
   w = _w;
@@ -99,7 +98,6 @@ int PCI_solver::setModelProblem () {
   objective_function = IloAdd(model, IloMinimize(env, expr_obj_fun));
   expr_obj_fun.end();
 
-
    // first constraint
   vector<bool> v_aux(N, true);
   IloExpr expr_first_const = create_expression(v_aux);
@@ -111,8 +109,7 @@ int PCI_solver::setModelProblem () {
   /*initial_constraints_v_infection(0);
   model.add(constraints);
 	// to see the model we created
-//*/
-
+  //*/
 }
 
 // solving the problem after initial setup
@@ -122,7 +119,7 @@ int PCI_solver::solveProblem () {
     cplex.getValues(_x, x);
     //if (rlModel)
     //root = cplex.getObjValue();
-		cout << cplex.getObjValue() << endl;
+		//cout << cplex.getObjValue() << endl;
   } catch (IloException& ex) {
     cout << "solveProblem:" << ex << endl;
   }
@@ -145,17 +142,18 @@ void PCI_solver::startAlg(int _option) {
 
 // what we need done by the end of the algorithm
 void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
-	objective_value += (int) (cplex.getObjValue() + 0.5);
-	gap = max(cplex.getMIPRelativeGap(), gap);
-	times += cplex.getTime();
-
-  cout << "Final obj value: " <<  cplex.getObjValue() << endl;
+	
+  float ob = cplex.getObjValue();
+  cout << "Final obj value: " <<  ob << endl;
 	cout << "Final gap: " << cplex.getMIPRelativeGap() << endl;
 	cout << "Time: " << cplex.getTime() << endl;
   //cplex.exportModel ("lpex1.lp");
-
+  objective_value += (int) ob;
+  gap = max(cplex.getMIPRelativeGap(), gap);
+  times += cplex.getTime();
 }
 
+// exception 
 void PCI_solver::Texception() {
   //double elapsedTime = timer.getTime();
   //printf("%s ; %.2f ; %.2f ; %.2f ; %.2f ; %d ; %d ; %d ; %d ; %d ; %d ; %d ;
@@ -165,6 +163,8 @@ void PCI_solver::Texception() {
   //iCapCounter, pCapCounter, rCapCounter, userCalls, lazyCalls);
 }
 
+// lazycallback adds new constraints depending on the current integer solution
+// founds in the program
 ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
   IloInt i;
   IloEnv masterEnv = getEnv();
@@ -183,7 +183,6 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
   for (int i = 0; i < N; i ++)
     if (infected[i])
       count_infected ++;
-  cout << "infected " << count_infected << endl;
 	if (s_cutter->finds_constraints(infected, obj.option)) {
           //self.tolerances.uppercutoff = min(s_cu)
 		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
@@ -198,87 +197,15 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 		}
 	}
 	else {
-		cout << "Ended search tree" << endl;
-    //print_vector(infected, "infected final: ");
+    // Asserts it is a valid solution found, if did not added constraints
 		vector<int> new_f = s_cutter->infect_graph(infected);
-    //print_vector(new_f, "new f out");
-		for (int i = 0; i < N; i ++) {
-      cout << new_f[i] << endl;
-      cout << (new_f[i] < 0) << endl;
+		for (int i = 0; i < N; i ++)
 			assert(new_f[i] < 0);
-    }
-    cout << "checked if viable " << endl;
 	}
 }
 
-void PCI_solver::setCplexSettings(int timelimit) {
-  cplex.use(lazyCallback(env, *this));
-  //cplex.setParam(IloCplex::CutUp, initial_ub); //Sets the upper cutoff tolerance.
 
-  /*if (vlDisp != 0) {
-    cplex.setParam(IloCplex::MIPDisplay, 2);
-    cplex.setParam(IloCplex::MIPInterval, vlDisp);
-  } else
-    cplex.setOut(Env.getNullStream());
-  cplex.setWarning(Env.getNullStream());
-  //*/
-  /*cplex.setParam(IloCplex::RootAlg, alg);
-  cplex.setParam(IloCplex::NodeAlg, alg);
-  cplex.setParam(IloCplex::Threads, numThreads);//*/
-
-  cplex.setParam(IloCplex::TiLim, timelimit);
-  /*if (vlEmph != 0)
-    cplex.setParam(IloCplex::MIPEmphasis, vlEmph);
-  if (vlGap != 0.0) {
-    cplex.setParam(IloCplex::EpAGap, 1 - vlGap);
-    cplex.setParam(IloCplex::EpInt, vlGap);
-    cplex.setParam(IloCplex::ObjDif, 1 - vlGap);
-    //cplex.setParam(IloCplex::EpOpt,vlGap);
-    //cplex.setParam(IloCplex::EpGap,vlGap);
-  }
-
-  if (mem != 0)
-    cplex.setParam(IloCplex::WorkMem, mem);
-
-  cplex.setParam(IloCplex::MemoryEmphasis, 1);
-
-  //cplex.setParam(IloCplex::Param::MIP::Strategy::VariableSelect, 3); // Strong branching
-  //cplex.setParam(IloCplex::VarSel, 3);
-  //cplex.setParam(IloCplex::StrongItLim, 1);
-
-  cplex.setParam(IloCplex::WorkDir, ".");
-  cplex.setParam(IloCplex::NodeFileInd, 2);
-  //TreLim
-  //*//*
-  cplex.setParam(IloCplex::HeurFreq, -1); // heuristic frequency
-  cplex.setParam(IloCplex::RINSHeur, -1); // do not apply RINS heuristic
-  cplex.setParam(IloCplex::FPHeur, -1); // do not apply feasibility pump heuristic
-  cplex.setParam(IloCplex::LBHeur, 0); // do not apply local branching heuristic
-  cplex.setParam(IloCplex::PreInd, 0); // do not apply presolve
-  cplex.setParam(IloCplex::PreslvNd, -1); // node presolve
-  cplex.setParam(IloCplex::Symmetry, 0); // symmetry breaking
-  cplex.setParam(IloCplex::AggInd, 0); // do not use any aggregator
-  cplex.setParam(IloCplex::BndStrenInd, 0); // no var bound strengthening
-  cplex.setParam(IloCplex::CoeRedInd, 0); // no coefficient reduction
-  cplex.setParam(IloCplex::DepInd, 0); // no dependency checker
-  cplex.setParam(IloCplex::Reduce, CPX_PREREDUCE_NOPRIMALORDUAL); // no reductions
-  cplex.setParam(IloCplex::CutPass, -1); // cutting plane passes at root node
-  cplex.setParam(IloCplex::Cliques, -1);
-  cplex.setParam(IloCplex::Covers, -1);
-  cplex.setParam(IloCplex::DisjCuts, -1);
-  cplex.setParam(IloCplex::FlowCovers, -1);
-  cplex.setParam(IloCplex::FlowPaths, -1);
-  cplex.setParam(IloCplex::FracCuts, -1);
-  cplex.setParam(IloCplex::GUBCovers, -1);
-  cplex.setParam(IloCplex::ImplBd, -1);
-  cplex.setParam(IloCplex::MIRCuts, -1);
-  cplex.setParam(IloCplex::MCFCuts, -1);
-  cplex.setParam(IloCplex::ZeroHalfCuts, -1);
-/*/
-
-  //cplex.setParam(IloCplex::RandomSeed, 31415);
-}
-
+// added initial constraints v, so starts with a more robust model
 void PCI_solver::initial_constraints_v_infection(int initial_v) {
   vector<bool> infected (N, false);//, used_vertices (N, false);
   int used_count = 0;
@@ -315,4 +242,73 @@ void PCI_solver::initial_constraints_v_infection(int initial_v) {
       //}
     }
   }
+}
+
+// set cplex parameters 
+void PCI_solver::setCplexSettings(int timelimit) {
+  cplex.use(lazyCallback(env, *this));
+  cplex.setParam(IloCplex::TiLim, timelimit);
+  cplex.setParam(IloCplex::RandomSeed, 31415);
+  cplex.setOut(env.getNullStream());
+  /*cplex.setParam(IloCplex::CutUp, initial_ub); //Sets the upper cutoff tolerance.
+
+    if (vlDisp != 0) {
+      cplex.setParam(IloCplex::MIPDisplay, 2);
+      cplex.setParam(IloCplex::MIPInterval, vlDisp);
+    } else
+      cplex.setOut(Env.getNullStream());
+    cplex.setWarning(Env.getNullStream());
+    //*/
+    /*cplex.setParam(IloCplex::RootAlg, alg);
+    cplex.setParam(IloCplex::NodeAlg, alg);
+    cplex.setParam(IloCplex::Threads, numThreads);//*/
+
+    /*if (vlEmph != 0)
+      cplex.setParam(IloCplex::MIPEmphasis, vlEmph);
+    if (vlGap != 0.0) {
+      cplex.setParam(IloCplex::EpAGap, 1 - vlGap);
+      cplex.setParam(IloCplex::EpInt, vlGap);
+      cplex.setParam(IloCplex::ObjDif, 1 - vlGap);
+      //cplex.setParam(IloCplex::EpOpt,vlGap);
+      //cplex.setParam(IloCplex::EpGap,vlGap);
+    }
+
+    if (mem != 0)
+      cplex.setParam(IloCplex::WorkMem, mem);
+
+    cplex.setParam(IloCplex::MemoryEmphasis, 1);
+
+    //cplex.setParam(IloCplex::Param::MIP::Strategy::VariableSelect, 3); // Strong branching
+    //cplex.setParam(IloCplex::VarSel, 3);
+    //cplex.setParam(IloCplex::StrongItLim, 1);
+
+    cplex.setParam(IloCplex::WorkDir, ".");
+    cplex.setParam(IloCplex::NodeFileInd, 2);
+    //TreLim
+    //*//*
+    cplex.setParam(IloCplex::HeurFreq, -1); // heuristic frequency
+    cplex.setParam(IloCplex::RINSHeur, -1); // do not apply RINS heuristic
+    cplex.setParam(IloCplex::FPHeur, -1); // do not apply feasibility pump heuristic
+    cplex.setParam(IloCplex::LBHeur, 0); // do not apply local branching heuristic
+    cplex.setParam(IloCplex::PreInd, 0); // do not apply presolve
+    cplex.setParam(IloCplex::PreslvNd, -1); // node presolve
+    cplex.setParam(IloCplex::Symmetry, 0); // symmetry breaking
+    cplex.setParam(IloCplex::AggInd, 0); // do not use any aggregator
+    cplex.setParam(IloCplex::BndStrenInd, 0); // no var bound strengthening
+    cplex.setParam(IloCplex::CoeRedInd, 0); // no coefficient reduction
+    cplex.setParam(IloCplex::DepInd, 0); // no dependency checker
+    cplex.setParam(IloCplex::Reduce, CPX_PREREDUCE_NOPRIMALORDUAL); // no reductions
+    cplex.setParam(IloCplex::CutPass, -1); // cutting plane passes at root node
+    cplex.setParam(IloCplex::Cliques, -1);
+    cplex.setParam(IloCplex::Covers, -1);
+    cplex.setParam(IloCplex::DisjCuts, -1);
+    cplex.setParam(IloCplex::FlowCovers, -1);
+    cplex.setParam(IloCplex::FlowPaths, -1);
+    cplex.setParam(IloCplex::FracCuts, -1);
+    cplex.setParam(IloCplex::GUBCovers, -1);
+    cplex.setParam(IloCplex::ImplBd, -1);
+    cplex.setParam(IloCplex::MIRCuts, -1);
+    cplex.setParam(IloCplex::MCFCuts, -1);
+    cplex.setParam(IloCplex::ZeroHalfCuts, -1);
+  /*/
 }
