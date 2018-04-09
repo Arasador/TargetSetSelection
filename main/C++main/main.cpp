@@ -11,7 +11,7 @@
 
 
 #define NUM_MODELS 7
-#define TIMELIMIT 300
+#define TIMELIMIT 10
 
 using namespace std;
 
@@ -59,7 +59,7 @@ void write_output_file (vector<int> objective_values, vector<double> times,
 
 int main (int argc, char** argv) {
   string model_selected = argv[1];
-  if (argc != 3 || model_selected.length() < 7) {
+  if (argc < 3 || argc > 4 || model_selected.length() < 7) {
     cout << "pci_test <selection of 7 models> <inputfile preprocessed>" << endl;
     exit(0);
   }
@@ -75,16 +75,16 @@ int main (int argc, char** argv) {
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
   for (int i = 0; i < components.size(); i ++) {
     vector<vector<int> > adjacency_list = components[i];
-    vector<int> f = adjacency_list[adjacency_list.size() - 2]; 
-    vector<int> w = adjacency_list[adjacency_list.size() - 1]; 
+    vector<int> f = adjacency_list[adjacency_list.size() - 2];
+    vector<int> w = adjacency_list[adjacency_list.size() - 1];
     adjacency_list.pop_back();
     adjacency_list.pop_back();
-    
+
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0')
         continue;
       IloEnv env_pci;
-      PCI_solver pci_solver(env_pci, adjacency_list, f, w);  
+      PCI_solver pci_solver(env_pci, adjacency_list, f, w);
       pci_solver.setModelProblem();
       pci_solver.setCplexSettings(TIMELIMIT);
       //vlDisp, vlEmph, alg, numThreads, vlGap, memory);

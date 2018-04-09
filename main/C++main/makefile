@@ -1,10 +1,10 @@
 CC = gcc
 CPP = g++
-CARGS = -O3 -fPIC -fexceptions -DIL_STD -DNDEBUG -lm
-CPLXINC = -I/opt/ibm/ILOG/CPLEX_Studio1271/cplex/include
-CNCRTINC = -I/opt/ibm/ILOG/CPLEX_Studio1271/concert/include
-CPLXLIB = -L/opt/ibm/ILOG/CPLEX_Studio1271/cplex/lib/x86-64_linux/static_pic
-CNCRTLIB = -L/opt/ibm/ILOG/CPLEX_Studio1271/concert/lib/x86-64_linux/static_pic
+CARGS = -g -fPIC -fexceptions -DIL_STD -lm #DNDEBUG
+CPLXINC = -I/home/lapo/alanapanizzi/Documents/cplex/cplex/include
+CNCRTINC = -I/home/lapo/alanapanizzi/Documents/cplex/concert/include
+CPLXLIB = -L/home/lapo/alanapanizzi/Documents/cplex/cplex/lib/x86-64_linux/static_pic
+CNCRTLIB = -L/home/lapo/alanapanizzi/Documents/cplex/concert/lib/x86-64_linux/static_pic
 CPLXARGS = -lilocplex -lcplex
 CNRTARGS = -lconcert -lpthread
 
