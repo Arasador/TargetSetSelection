@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <assert.h>
+#include <math.h>
 #include <ilcplex/ilocplex.h>
 #include "S_cutter.h"
 
@@ -117,9 +118,6 @@ int PCI_solver::solveProblem () {
   try {
     cplex.solve();
     cplex.getValues(_x, x);
-    //if (rlModel)
-    //root = cplex.getObjValue();
-		//cout << cplex.getObjValue() << endl;
   } catch (IloException& ex) {
     cout << "solveProblem:" << ex << endl;
   }
@@ -142,18 +140,16 @@ void PCI_solver::startAlg(int _option) {
 
 // what we need done by the end of the algorithm
 void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
-	
-  float ob = cplex.getObjValue();
-  cout << "Final obj value: " <<  ob << endl;
+  cout << "Final obj value: " << cplex.getObjValue() << endl;
 	cout << "Final gap: " << cplex.getMIPRelativeGap() << endl;
 	cout << "Time: " << cplex.getTime() << endl;
   //cplex.exportModel ("lpex1.lp");
-  objective_value += (int) ob;
+  objective_value += (int) round(cplex.getObjValue());
   gap = max(cplex.getMIPRelativeGap(), gap);
   times += cplex.getTime();
 }
 
-// exception 
+// exception
 void PCI_solver::Texception() {
   //double elapsedTime = timer.getTime();
   //printf("%s ; %.2f ; %.2f ; %.2f ; %.2f ; %d ; %d ; %d ; %d ; %d ; %d ; %d ;
@@ -175,14 +171,11 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 	vector<bool> infected(obj.N, false);
   getValues(xSol, obj.x);
 	for (int i = 0; i < obj.N; i ++) {
-		infected[i] = xSol[i] == 1.0;
+		infected[i] = ((int) round(xSol[i])) == 1;
 	}
 	bool found_constraints = false;
 	S_cutter* s_cutter = obj.s_cutter;
   int count_infected = 0;
-  for (int i = 0; i < N; i ++)
-    if (infected[i])
-      count_infected ++;
 	if (s_cutter->finds_constraints(infected, obj.option)) {
           //self.tolerances.uppercutoff = min(s_cu)
 		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
@@ -244,7 +237,7 @@ void PCI_solver::initial_constraints_v_infection(int initial_v) {
   }
 }
 
-// set cplex parameters 
+// set cplex parameters
 void PCI_solver::setCplexSettings(int timelimit) {
   cplex.use(lazyCallback(env, *this));
   cplex.setParam(IloCplex::TiLim, timelimit);
