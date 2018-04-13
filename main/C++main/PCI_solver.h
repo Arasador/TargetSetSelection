@@ -15,7 +15,7 @@ class PCI_solver {
 	  vector<vector<int> > adjacency_list;
 	  vector<vector<bool> > adjacency_matrix;
 	  vector<int> f, w;
-	  int N, M, option, constraints_counter;
+	  int N, M, option, constraints_counter, lazycall_counter;
 		IloNum start_time;
 	  //int initial_ub; //initial lower bound (cost of a valid tour)
 	  IloEnv env;
@@ -56,6 +56,7 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
   w = _w;
 	s_cutter = new S_cutter(adjacency_list, f);
   N = f.size();
+  lazycall_counter = 0;
 	constraints_counter = 0;
   adjacency_matrix = vector<vector<bool> >(N, vector<bool>(N, false));
   for (int v = 0; v < N; v ++) {
@@ -127,6 +128,7 @@ int PCI_solver::solveProblem () {
 // sets all initial parameters
 void PCI_solver::startAlg(int _option) {
 	option = _option;
+
   //nsecs = nprecs = npredCuts = nsuccCuts = nprecBal = 0;
   //root = 0.0;
   //rlModel = true;
@@ -164,7 +166,7 @@ void PCI_solver::Texception() {
 ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
   IloInt i;
   IloEnv masterEnv = getEnv();
-  int N = obj.x.getSize();
+  int N = obj.N; //obj.x.getSize();
   // Get the current x solution
 
   IloNumArray xSol(masterEnv);
@@ -176,6 +178,16 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 	bool found_constraints = false;
 	S_cutter* s_cutter = obj.s_cutter;
   int count_infected = 0;
+
+  ofstream outfile("out_lazyconstraint.txt", ios::app);
+  outfile << obj.lazycall_counter ++ << " callback:\n";
+  outfile << "Objective Value: " << getObjValue() << "\n Infected vertices: "
+    << infected[0];
+  for (int i = 1 ; i < obj.N; i ++) {
+    outfile << ", " << infected[i];
+  }
+
+
 	if (s_cutter->finds_constraints(infected, obj.option)) {
           //self.tolerances.uppercutoff = min(s_cu)
 		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
@@ -186,6 +198,7 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 				cutLhs += obj.x[k];
 			}
       //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
+      outfile << "\nconstraint: " << cutLhs << " >= " << (s_cutter->constraints_rhs_res)[i];
 			add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
 		}
 	}
@@ -195,6 +208,8 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 		for (int i = 0; i < N; i ++)
 			assert(new_f[i] < 0);
 	}
+  outfile << "\n";
+  outfile.close();
 }
 
 
