@@ -1,0 +1,11 @@
+#Ignores all bash files, since they are used in tests
+*.sh
+#Ignores all dat and txt files, since they are programs output
+*.dat
+*.txt
+#Ignores makefile, since it difers from machine to machine
+main/C++main/makefile
+
+
+main/C++main/pci_test
+ToDoList.txt~

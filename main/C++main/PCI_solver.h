@@ -1,10 +1,3 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <assert.h>
-#include <math.h>
-#include <ilcplex/ilocplex.h>
 #include "S_cutter.h"
 
 using namespace std;

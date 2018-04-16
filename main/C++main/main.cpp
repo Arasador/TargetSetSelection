@@ -1,19 +1,8 @@
-#include <vector>
-#include <queue>
-#include <deque>
-#include <stack>
-
-#include <iostream>
-#include <fstream>
-#include <ilcplex/ilocplex.h>
 #include "PCI_solver.h"
 #include "preprocessing.cpp"
 
-
-#define NUM_MODELS 7
 #define TIMELIMIT 300
 
-using namespace std;
 
 // given solutions, writes results in a file
 void write_output_file (vector<int> objective_values, vector<double> times,
@@ -34,8 +23,7 @@ int main (int argc, char** argv) {
   // reads input file and stores it into components vector
   deque<vector<vector<int> > > components = data_preprocessing(argc, argv);
   // possible selected models
-  int models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
-    S_SMALLER_H1, S_SMALLER_H2};
+  
   vector<int> objective_values(NUM_MODELS, 0);
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
   ofstream outfile("out_lazyconstraint.txt", ios::app);
