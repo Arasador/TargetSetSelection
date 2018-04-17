@@ -32,7 +32,8 @@ void print_matrix2(vector<vector<T> > &m, string message) {
     print_vector(m[i], "");
 }
 
-
+// dimacs are the coloring problem instances, and they have one extra argument
+// where it defines which way to create the trashold vector f
 void read_file_dimacs(string filename, string option, vector<vector<int> > 
   &component) {
   cout << "dimacs" << endl;
@@ -84,16 +85,23 @@ void read_file_dimacs(string filename, string option, vector<vector<int> >
   component = adjacency_list;
 }
 
-
+// instances created by us are in this format
 void read_file_formated(string filename, vector<vector<int> > & component) {
-
   fstream inputfile(filename);
-  if (! inputfile.is_open()) {
-    cout << "Unable to open file"; 
-    abort();
-  }
   int N, M;
-  inputfile >> N >> M;
+  char ch;
+  inputfile >> ch;
+  if (! inputfile.is_open()) {
+    cout << "Unable to open file" << endl; 
+    exit(0);
+  } 
+  else if (ch == 'c') {
+    cout << "Dimacs file with too few arguments" << endl; 
+    exit(0);
+  }
+  N = (int) ch;
+  inputfile >> M;
+
   vector<int> f(N), w(N);
   for (int i = 0; i < N; i ++)
     inputfile >> f[i] >> w[i];
@@ -235,17 +243,22 @@ separate_in_connected_instances(vector<vector<int> > &adjacency_list,
   return components;
 }
 
-deque<vector<vector<int> > > data_preprocessing(int argc, char* argv[]) {
-  vector<vector<int> > adjacency_list;
 
-  if (argc == 4) 
+deque<vector<vector<int> > > data_preprocessing(int argc, char* argv[]) {
+  // reads graphs adjacency list, f and w from file
+  vector<vector<int> > adjacency_list;
+  if (argc == 4) {
+    //in case the file is in the dimacs format
     read_file_dimacs(argv[2], argv[3], adjacency_list);
-  else if (argc == 3)
+  }
+  else if (argc == 3) {
+    // file formated by us
     read_file_formated(argv[2], adjacency_list);
+  }
   else {
     cout << "PCI_problem_cplex <model> <datafile> <?option if in dimacs format>"
       << endl;
-    abort();
+    exit(0);
   }
   vector<int> f, w;
   f = adjacency_list[adjacency_list.size() - 2];
@@ -253,6 +266,11 @@ deque<vector<vector<int> > > data_preprocessing(int argc, char* argv[]) {
   adjacency_list.pop_back();
   adjacency_list.pop_back();
   int N = f.size();
+  for (int v = 0; v < N; v ++) {
+    cout << ", " << v;
+    if (adjacency_list[v].size() < f[v]) cout << " WRONG ";
+  }
+  cout << endl;
   vector<bool> removed_vertices(N, false);
   vector<int> num_neighbors(N, 0), type_vertex(N, FREE);
   for (int i = 0; i < N; i ++)
@@ -275,6 +293,10 @@ deque<vector<vector<int> > > data_preprocessing(int argc, char* argv[]) {
   w = adjacency_list[adjacency_list.size() - 1];
   adjacency_list.pop_back();
   adjacency_list.pop_back();
-
+  for (int v = 0; v < N; v ++) {
+    cout << ", " << v;
+    if (adjacency_list[v].size() < f[v]) cout << " WRONG ";
+  }
+  cout << endl;
   return separate_in_connected_instances(adjacency_list, f, w);
 }
