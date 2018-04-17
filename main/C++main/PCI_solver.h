@@ -34,6 +34,7 @@ class PCI_solver {
     void endAlg (int &objective_value, double &times, double &gap);
     void Texception ();
     void initial_constraints_v_infection (int initial_v);
+    void add_initial_constraints_neighbors();
 };
 
 //--------------- Constructor
@@ -101,8 +102,10 @@ int PCI_solver::setModelProblem () {
   constraints.add(ctrnt);
 
 	// adds n constraints using s, and initial v = 0
-  /*initial_constraints_v_infection(0);
+  //initial_constraints_v_infection(0);
+  add_initial_constraints_neighbors();
   model.add(constraints);
+  cplex.exportModel ("model.lp");
 	// to see the model we created
   //*/
 }
@@ -138,7 +141,7 @@ void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
   cout << "Final obj value: " << cplex.getObjValue() << endl;
 	cout << "Final gap: " << cplex.getMIPRelativeGap() << endl;
 	cout << "Time: " << cplex.getTime() << endl;
-  //cplex.exportModel ("lpex1.lp");
+  cplex.exportModel ("lpex1.lp");
   objective_value += (int) round(cplex.getObjValue());
   gap = max(cplex.getMIPRelativeGap(), gap);
   times += cplex.getTime();
@@ -174,11 +177,13 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 
   ofstream outfile("out_lazyconstraint.txt", ios::app);
   outfile << obj.lazycall_counter ++ << " callback:\n";
-  outfile << "Objective Value: " << getObjValue() << "\n Infected vertices: "
-    << infected[0];
+  outfile << "Objective Value: " << getObjValue() <<"  Gap: " 
+  << getMIPRelativeGap() << " \n"; 
+  outfile << "\n Infected vertices: "  << infected[0];
   for (int i = 1 ; i < obj.N; i ++) {
     outfile << ", " << infected[i];
   }
+  outfile <<"\n";
 
 
 	if (s_cutter->finds_constraints(infected, obj.option)) {
@@ -201,7 +206,7 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 		for (int i = 0; i < N; i ++)
 			assert(new_f[i] < 0);
 	}
-  outfile << "\n";
+  outfile << "\n\n";
   outfile.close();
 }
 
@@ -245,6 +250,22 @@ void PCI_solver::initial_constraints_v_infection(int initial_v) {
   }
 }
 
+// addes a constraint to initial model for each pair of vertices neighbors and 
+//that have trashold equal to num of neighbors 
+void PCI_solver::add_initial_constraints_neighbors() {
+  for (int v = 0; v < N; v ++) {
+    for (auto u: adjacency_list[v]) {
+      if (v < u && f[v] == adjacency_list[v].size()
+       && f[u] == adjacency_list[u].size()) {
+        IloRange new_constraint = x[u] + x[v] >= 1;
+        new_constraint.setName("#Neighbors_maxed");
+        constraints.add(new_constraint);
+        //add(new_constraint).end();
+      }
+    }
+  }
+}
+
 // set cplex parameters
 void PCI_solver::setCplexSettings(int timelimit) {
   cplex.use(lazyCallback(env, *this));
@@ -279,7 +300,8 @@ void PCI_solver::setCplexSettings(int timelimit) {
 
     cplex.setParam(IloCplex::MemoryEmphasis, 1);
 
-    //cplex.setParam(IloCplex::Param::MIP::Strategy::VariableSelect, 3); // Strong branching
+    //cplex.setParam(IloCplex::Param::MIP::Strategy::VariableSelect, 3); 
+    // Strong branching
     //cplex.setParam(IloCplex::VarSel, 3);
     //cplex.setParam(IloCplex::StrongItLim, 1);
 
