@@ -5,7 +5,7 @@
 *.txt
 #Ignores makefile, since it difers from machine to machine
 main/C++main/makefile
-
+*.lp
 
 main/C++main/pci_test
 ToDoList.txt~
