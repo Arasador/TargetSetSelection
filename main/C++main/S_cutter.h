@@ -33,7 +33,7 @@ class S_cutter {
   // ----Smaller S
   int select_random_vertex(vector<bool> infected);
   void infect_one_vertex(int vi, vector<bool> &infected, vector<int> &new_f);
-  bool can_select_random_component(vector<bool> infected);
+  bool can_select_random_component(vector<bool> infected, int selected_v);
     void shuffle_positions_in_range(int i, int j, vector<int> &weights);
 
   // Domination
@@ -422,17 +422,17 @@ void S_cutter::infect_one_vertex(int vi, vector<bool> &infected,
 
 // modifies infected vertices, so everything outside one component counts as
 // infected. Return if we still have components
-bool S_cutter::can_select_random_component(vector<bool> infected) {
-  int cv = -1;
-  for (int i = 0; i < N; i ++)
-    if (! infected[i]) {
-      cv = i;
-      break;
-    }
-  if (cv == -1)
+bool S_cutter::can_select_random_component(vector<bool> infected, int selected_v) {
+  // if passed a vertex from the selected component, continue, else, select randomly
+  int component_selected_v = selected_v;
+  if (selected_v == -1) {
+    component_selected_v = select_random_vertex(infected);
+  }
+  // if could not select any, all vertices are infected
+  if (component_selected_v == -1)
     return false;
   deque<int> queue;
-  queue.push_back(cv);
+  queue.push_back(component_selected_v);
   vector<bool> component(N, false);
   while (! queue.empty()) {
     int v = queue[0];
@@ -464,7 +464,7 @@ bool S_cutter::finds_s_smaller_constraints(vector<bool> infected, int option) {
   //print(selection_order)
   int position = 0;
   //keeps selecting one of the avaliable components
-  while (can_select_random_component(infected)) {
+  while (can_select_random_component(infected, -1)) {
     int v = select_next_vertex(selection_order, infected, position, option,
       new_f);
     assert(v != -1);
@@ -573,7 +573,7 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
   vector<int> selection_order = weighted_option_selected(option);
   int position = 0;
   // keeps selecting one of the avaliable components
-  while (can_select_random_component(infected)) {
+  while (can_select_random_component(infected, -1)) {
     int v = select_next_vertex(selection_order, infected, position, option,
       new_f);
     assert(v != -1);
@@ -602,9 +602,9 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, int option
   // weighted or not
   vector<int> selection_order = weighted_option_selected(option);
   //print(selection_order)
-  int position = 0;
+  int position = 0, component_selected = -1, vertex_from_component = -1;
   //keeps selecting one of the avaliable components
-  while (can_select_random_component(infected)) {
+  while (can_select_random_component(infected, vertex_from_component)) {
     int v = select_next_vertex(selection_order, infected, position, option,
       new_f);
     assert(v != -1);
@@ -615,15 +615,35 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, int option
     if (! finds_S_constraints(new_f)){
       break;
     }
-    for (int i = 0; i < prev_rhs.size(); i ++) {
-      if (prev_rhs[i] > constraints_rhs_res[i]) {
-        // if left side of the constraint shrinked, returns true and mantain
-        //previous constraint
-        constraints_rhs_res = prev_rhs;
-        constraints_lhs_res = prev_lhs;
-        return true;
+    // find max right sided constraint 
+    int argmax = -1, valuemax = -1;
+    for (int i = 0; i < constraints_rhs_res.size(); i ++) {
+      if (valuemax < constraints_rhs_res[i]) {
+        valuemax = constraints_rhs_res[i];
+        argmax = i;
       }
     }
+    assert(argmax != -1);
+    // compares max right sided constraint
+    if (prev_rhs[component_selected] > constraints_rhs_res[argmax]) {
+      // if left side of the constraint shrinked, returns true and mantain
+      //previous constraint
+      constraints_rhs_res = prev_rhs;
+      constraints_lhs_res = prev_lhs;
+      return true;
+    }
+    component_selected = argmax;
+    vertex_from_component = constraints_lhs_res[argmax][0];
+
+    /* this seems wrong
+    if (prev_rhs[i] > constraints_rhs_res[i]) {
+      // if left side of the constraint shrinked, returns true and mantain
+      //previous constraint
+      constraints_rhs_res = prev_rhs;
+      constraints_lhs_res = prev_lhs;
+      return true;
+    }
+    //*/
   }
   return constraints_rhs_res.size() != 0;
 }
