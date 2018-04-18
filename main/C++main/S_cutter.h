@@ -591,9 +591,81 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
   return ! constraints_lhs_res.empty();
 }
 
+//###############################################################################
+bool viable_new_right_side_constraint(vector<int>& max_rhs_constraints, int prev_component) {
+  // find max right sided constraint 
+    int argmax = -1, valuemax = -1;
+    for (int i = 0; i < constraints_rhs_res.size(); i ++) {
+      if (valuemax < constraints_rhs_res[i]) {
+        valuemax = constraints_rhs_res[i];
+        argmax = i;
+        max_rhs_constraints = vector<int>(1, i);
+      }
+      else if (valuemax == constraints_rhs_res[i]) {
+        max_rhs_constraints.push_back(i);
+      }
+    }
+    assert(argmax != -1);
+    // compares max right sided constraint
+    if (prev_rhs[prev_component] > constraints_rhs_res[argmax]) {
+      constraints_rhs_res = prev_rhs;
+      constraints_lhs_res = prev_lhs;
+      return false;
+    }
+    return true;
+}
+
+
+// call a process for each component S created in the process of infecting vertices 
+//randomly
+// TODO: fix this function
+bool S_cutter::S_constraints_recursively(vector<bool> &infected, vector<bool> 
+  vertices_selected, vector<int> new_f, const vector<int>& selection order,
+  int position, model model_chosen) {
+  int N = infected.size();
+  int previous_component = -1, vertex_from_component = -1; 
+  // while can select S's to create new constraints, continues
+  while(can_select_random_component(infected, vertex_from_component)) {
+    //select next vertex
+    int v = select_next_vertex(selection_order, infected, position, model_chosen,
+      new_f);
+    assert(v != -1);
+    infect_one_vertex(v, infected, new_f);
+    for (int i = 0; i < N; i ++) {
+      if (! vertices_selected[i]) {
+        new_f[i] = INFECTED;
+      }
+    }
+    if (! finds_S_constraints(new_f)){
+      break;
+    }
+    if (! viable_new_right_side_constraint) {
+      return true;
+    }
+   
+    for (int i = 0; i < max_size_rhs.size(); i ++) {
+      // selects only vertices in S to go to new function
+      vector<bool> vertices_selected_new_component(N, false);
+      for (auto u: constraints_lhs_res[max_size_rhs[i]]) {
+        vertices_selected_new_component[u] = true;
+      }
+      if (i == 0) {
+        component_selected = max_size_rhs[0];
+        vertex_from_component = constraints_lhs_res[component_selected][0];
+        vertices_selected = vertices_selected_new_component;
+      }
+      S_constraints_recursively(infected, vertices_selected_new_component, 
+        new_f, selection_order, position, model_chosen);
+    }
+  }
+}
+
+
+
 //##############################################################################
 //this function returns if we found constraints for a smaller S new
-bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, model model_chosen) {
+bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, 
+  model model_chosen) {
   vector<int> new_f = infect_graph(infected);
   if (! finds_S_constraints(new_f))
     return false;
@@ -615,34 +687,14 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, model mode
       break;
     }
     // find max right sided constraint 
-    int argmax = -1, valuemax = -1;
-    for (int i = 0; i < constraints_rhs_res.size(); i ++) {
-      if (valuemax < constraints_rhs_res[i]) {
-        valuemax = constraints_rhs_res[i];
-        argmax = i;
-      }
-    }
-    assert(argmax != -1);
-    // compares max right sided constraint
-    if (prev_rhs[component_selected] > constraints_rhs_res[argmax]) {
-      // if left side of the constraint shrinked, returns true and mantain
-      //previous constraint
-      constraints_rhs_res = prev_rhs;
-      constraints_lhs_res = prev_lhs;
+    // if left side of the constraint shrinked, returns true and mantain
+    //previous constraint
+    vector<int> max_size_rhs;
+    if (! viable_new_right_side_constraint(max_size_rhs)) {
       return true;
     }
-    component_selected = argmax;
-    vertex_from_component = constraints_lhs_res[argmax][0];
-
-    /* this seems wrong
-    if (prev_rhs[i] > constraints_rhs_res[i]) {
-      // if left side of the constraint shrinked, returns true and mantain
-      //previous constraint
-      constraints_rhs_res = prev_rhs;
-      constraints_lhs_res = prev_lhs;
-      return true;
-    }
-    //*/
+    component_selected = max_size_rhs[0];
+    vertex_from_component = constraints_lhs_res[component_selected][0];
   }
   return constraints_rhs_res.size() != 0;
 }
