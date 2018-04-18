@@ -27,9 +27,10 @@ class S_cutter {
   vector<int> weighted_positions();
   vector<int> normal_shuffle();
   int select_next_vertex(const vector<int> &vertices,
-    const vector<bool> &infected, int &position, int option, vector<int> new_f);
+    const vector<bool> &infected, int &position, model model_chosen,
+    vector<int> new_f);
   void reweight_vector_vertices_selected(const vector<vector<int> > &lhs);
-  vector<int> weighted_option_selected(int option) ;
+  vector<int> weighted_option_selected(model model_chosen) ;
   // ----Smaller S
   int select_random_vertex(vector<bool> infected);
   void infect_one_vertex(int vi, vector<bool> &infected, vector<int> &new_f);
@@ -43,20 +44,20 @@ class S_cutter {
     const vector<int> &bc_lhs_int, int bc_rhs);
   void add_not_dominated_new_constraints(vector<vector<int> > &list_lhs,
     vector<int> &list_rhs);
-  bool finds_s_with_domination_constraints(vector<bool> &infected,  int option);
+  bool finds_s_with_domination_constraints(vector<bool> &infected, model model_chosen);
   // new S_smaller
-  bool find_S_smaller_new_constraints(vector<bool> &infected, int option);
+  bool find_S_smaller_new_constraints(vector<bool> &infected, model model_chosen);
 
   // --- variables
   vector<vector<int> > constraints_lhs_res;
   vector<int> constraints_rhs_res;
   // --- constructor
-  S_cutter(Vector2_int, vector<int>);
+  S_cutter(vector<vector<int> >, vector<int>);
   ~S_cutter();
   // methods
-  bool finds_s_smaller_constraints(vector<bool> infected, int option);
+  bool finds_s_smaller_constraints(vector<bool> infected, model model_chosen);
   vector<int> infect_graph(vector<bool> &infected);
-  bool finds_constraints(vector<bool> infected, int option);
+  bool finds_constraints(vector<bool> infected, model model_chosen);
 };
 //##############################################################################
 //----------------- Auxiliar Functions
@@ -77,13 +78,13 @@ void print_matrix(const vector<vector<T> > &m, string message) {
 }
 
 // detects if the option selected is a weighted option
-bool is_weighted_option(int option) {
-  return option == WS_SMALLER || option == WDOMINATED;
+bool is_weighted_option(model model_chosen) {
+  return model_chosen == WS_SMALLER || model_chosen == WDOMINATED;
 }
 //##############################################################################
 // ----------------Constructor
 
-S_cutter::S_cutter(Vector2_int _adjacency_list, vector<int> _f) {
+S_cutter::S_cutter(vector<vector<int> > _adjacency_list, vector<int> _f) {
   adjacency_list = _adjacency_list;
   f = _f;
   N = f.size();
@@ -281,11 +282,11 @@ vector<int> S_cutter::normal_shuffle(){
 
 // given an order of vertices, gives next that is not infected
 int S_cutter::select_next_vertex(const vector<int> &vertices,
-  const vector<bool> &infected, int &position, int option, vector<int> new_f) {
-  if (option == S_SMALLER_H1) {
+  const vector<bool> &infected, int &position, model model_chosen, vector<int> new_f) {
+  if (model_chosen == S_SMALLER_H1) {
     return heuristic_fmin_select_vertex(new_f);
   }
-  else if (option == S_SMALLER_H2) {
+  else if (model_chosen == S_SMALLER_H2) {
     return heuristic_degreefmin_select_vertex(new_f);
   }
 
@@ -322,8 +323,8 @@ void S_cutter::reweight_vector_vertices_selected(const vector<vector<int> >
 }
 
 // sees which weighted option is selected
-vector<int> S_cutter::weighted_option_selected(int option) {
-  if (option == WS_SMALLER || option == WDOMINATED) {
+vector<int> S_cutter::weighted_option_selected(model model_chosen) {
+  if (model_chosen == WS_SMALLER || model_chosen == WDOMINATED) {
     //return weighted_shuffle()
     return weighted_positions();
   }
@@ -407,14 +408,13 @@ void S_cutter::infect_one_vertex(int vi, vector<bool> &infected,
   while (! queue.empty()) {
     int v = queue[0];
     queue.pop_front();
-    for (Vector_it u = adjacency_list[v].begin(); u != adjacency_list[v].end();
-      ++ u) {
-      if (infected[* u])
+    for (auto u: adjacency_list[v]) {
+      if (infected[u])
         continue;
-      if ((-- new_f[* u]) <= 0) {
-        queue.push_back(* u);
-        infected[* u] = true;
-        new_f[* u] = INFECTED;
+      if ((-- new_f[u]) <= 0) {
+        queue.push_back(u);
+        infected[u] = true;
+        new_f[u] = INFECTED;
       }
     }
   }
@@ -438,11 +438,10 @@ bool S_cutter::can_select_random_component(vector<bool> infected, int selected_v
     int v = queue[0];
     queue.pop_front();
     component[v] = true;
-    for (Vector_it u = adjacency_list[v].begin(); u != adjacency_list[v].end();
-    ++ u) {
-      if (! infected[* u] && !component[* u]) {
-        component[* u] = true;
-        queue.push_back(* u);
+    for (auto u: adjacency_list[v]) {
+      if (! infected[u] && !component[u]) {
+        component[u] = true;
+        queue.push_back(u);
       }
     }
   }
@@ -454,18 +453,18 @@ bool S_cutter::can_select_random_component(vector<bool> infected, int selected_v
 }
 
 //this function returns if we found constraints for a smaller S
-bool S_cutter::finds_s_smaller_constraints(vector<bool> infected, int option) {
+bool S_cutter::finds_s_smaller_constraints(vector<bool> infected, model model_chosen) {
   vector<int> new_f = infect_graph(infected);
   if (! finds_S_constraints(new_f))
     return false;
   // gets a vector with the section order of vertices based on the option
   // weighted or not
-  vector<int> selection_order = weighted_option_selected(option);
+  vector<int> selection_order = weighted_option_selected(model_chosen);
   //print(selection_order)
   int position = 0;
   //keeps selecting one of the avaliable components
   while (can_select_random_component(infected, -1)) {
-    int v = select_next_vertex(selection_order, infected, position, option,
+    int v = select_next_vertex(selection_order, infected, position, model_chosen,
       new_f);
     assert(v != -1);
     infect_one_vertex(v, infected, new_f);
@@ -473,7 +472,7 @@ bool S_cutter::finds_s_smaller_constraints(vector<bool> infected, int option) {
       break;
     }
   }
-  if (is_weighted_option(option)) {
+  if (is_weighted_option(model_chosen)) {
     reweight_vector_vertices_selected(constraints_lhs_res);
   }
   for (int r = 0; r < constraints_rhs_res.size(); r ++)
@@ -562,7 +561,7 @@ void S_cutter::add_not_dominated_new_constraints(vector<vector<int> > &new_lhs,
 
 //this function returns if we found constraints for a smaller S and domination
 bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
-  int option) {
+  model model_chosen) {
   vector<int> new_f = infect_graph(infected);
   if (!finds_S_constraints(new_f))
     return false;
@@ -570,11 +569,11 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
   vector<int> list_rhs = constraints_rhs_res;
   // gets a vector with the section order of vertices based on the option
   // weighted or not
-  vector<int> selection_order = weighted_option_selected(option);
+  vector<int> selection_order = weighted_option_selected(model_chosen);
   int position = 0;
   // keeps selecting one of the avaliable components
   while (can_select_random_component(infected, -1)) {
-    int v = select_next_vertex(selection_order, infected, position, option,
+    int v = select_next_vertex(selection_order, infected, position, model_chosen,
       new_f);
     assert(v != -1);
     infect_one_vertex(v, infected, new_f);
@@ -582,7 +581,7 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
       add_not_dominated_new_constraints(list_lhs, list_rhs);
     else
       break;
-    if (is_weighted_option(option)) {
+    if (is_weighted_option(model_chosen)) {
       reweight_vector_vertices_selected(list_lhs);
       //print("v_vector ", self.variables_used )
     }
@@ -594,18 +593,18 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
 
 //##############################################################################
 //this function returns if we found constraints for a smaller S new
-bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, int option) {
+bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, model model_chosen) {
   vector<int> new_f = infect_graph(infected);
   if (! finds_S_constraints(new_f))
     return false;
   // gets a vector with the section order of vertices based on the option
   // weighted or not
-  vector<int> selection_order = weighted_option_selected(option);
+  vector<int> selection_order = weighted_option_selected(model_chosen);
   //print(selection_order)
   int position = 0, component_selected = -1, vertex_from_component = -1;
   //keeps selecting one of the avaliable components
   while (can_select_random_component(infected, vertex_from_component)) {
-    int v = select_next_vertex(selection_order, infected, position, option,
+    int v = select_next_vertex(selection_order, infected, position, model_chosen,
       new_f);
     assert(v != -1);
     infect_one_vertex(v, infected, new_f);
@@ -651,32 +650,32 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, int option
 
 //##############################################################################
 // selectes which model will run
-bool S_cutter::finds_constraints(vector<bool> infected, int option) {
-  switch (option) {
+bool S_cutter::finds_constraints(vector<bool> infected, model model_chosen) {
+  switch (model_chosen) {
     case S_MODEL:
       //cout << "---------------S_model-----------------" << endl;
       return finds_s_model_constraints(infected);
     case S_SMALLER:
       //cout << "---------------S_smaller-----------------" << endl;
-      return finds_s_smaller_constraints(infected, option);
+      return finds_s_smaller_constraints(infected, model_chosen);
     case WS_SMALLER:
       //cout << "---------------S_smallerWW-----------------" << endl;
-      return finds_s_smaller_constraints(infected, option);
+      return finds_s_smaller_constraints(infected, model_chosen);
     case S_SMALLER_H1:
       //cout << "here H1" << endl;
-      return finds_s_smaller_constraints(infected, option);
+      return finds_s_smaller_constraints(infected, model_chosen);
     case S_SMALLER_H2:
       //cout << "here H2" << endl;
-    return finds_s_smaller_constraints(infected, option);
+    return finds_s_smaller_constraints(infected, model_chosen);
     case DOMINATED:
       //cout << "---------------Dominated-----------------" << endl;
-      return finds_s_with_domination_constraints(infected, option);
+      return finds_s_with_domination_constraints(infected, model_chosen);
     case WDOMINATED:
       //cout << "---------------DominatedWWWW-----------------" << endl;
-      return finds_s_with_domination_constraints(infected, option);
+      return finds_s_with_domination_constraints(infected, model_chosen);
       //*/
     case S_SMALLER_NEW:
       //cout << "---------------S_smaller_new-----------------" << endl;
-      return find_S_smaller_new_constraints(infected, option);
+      return find_S_smaller_new_constraints(infected, model_chosen);
   }
 }

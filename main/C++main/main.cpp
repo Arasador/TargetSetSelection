@@ -23,12 +23,14 @@ int main (int argc, char** argv) {
   // reads input file and stores it into components vector
   deque<vector<vector<int> > > components = data_preprocessing(argc, argv);
   // possible selected models
-  
   vector<int> objective_values(NUM_MODELS, 0);
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
   ofstream outfile("out_lazyconstraint.txt", ios::app);
   outfile << argv[2] << " \n" ;
   outfile.close();
+  // list of all models we have
+  model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
+  S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
   for (int i = 0; i < components.size(); i ++) {
 
     vector<vector<int> > adjacency_list = components[i];

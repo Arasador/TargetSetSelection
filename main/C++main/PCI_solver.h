@@ -8,11 +8,12 @@ class PCI_solver {
 	  vector<vector<int> > adjacency_list;
 	  vector<vector<bool> > adjacency_matrix;
 	  vector<int> f, w;
-	  int N, M, option, constraints_counter, lazycall_counter;
+	  int N, M, constraints_counter, lazycall_counter;
+    model model_chosen;
 		IloNum start_time;
 	  //int initial_ub; //initial lower bound (cost of a valid tour)
 	  IloEnv env;
-		IloModel model;
+		IloModel c_model;
 		IloCplex cplex;
 		/*public variables... workaround for access them in the callbacks*/
 		IloNumVarArray x;
@@ -30,7 +31,7 @@ class PCI_solver {
   	virtual int solveProblem ();
     virtual IloExpr create_expression (vector<bool>);
     void setCplexSettings (int timelimit);
-    void startAlg (int _option);
+    void startAlg (model _model_chosen);
     void endAlg (int &objective_value, double &times, double &gap);
     void Texception ();
     void initial_constraints_v_infection (int initial_v);
@@ -42,8 +43,8 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
 	vector<int> _f, vector<int> _w) {
   // initializes cplex enviroment and model
   env = _env;
-  model = IloModel(_env);
-  cplex = IloCplex(model);
+  c_model = IloModel(_env);
+  cplex = IloCplex(c_model);
   //rlModel = false;
   adjacency_list = _adjacency_list;
   f = _f;
@@ -91,7 +92,7 @@ int PCI_solver::setModelProblem () {
     x[i].setName(var_name);
     expr_obj_fun += w[i] * x[i];
   }
-  objective_function = IloAdd(model, IloMinimize(env, expr_obj_fun));
+  objective_function = IloAdd(c_model, IloMinimize(env, expr_obj_fun));
   expr_obj_fun.end();
 
    // first constraint
@@ -104,7 +105,7 @@ int PCI_solver::setModelProblem () {
 	// adds n constraints using s, and initial v = 0
   //initial_constraints_v_infection(0);
   add_initial_constraints_neighbors();
-  model.add(constraints);
+  c_model.add(constraints);
   cplex.exportModel ("model.lp");
 	// to see the model we created
   //*/
@@ -122,8 +123,8 @@ int PCI_solver::solveProblem () {
 }
 
 // sets all initial parameters
-void PCI_solver::startAlg(int _option) {
-	option = _option;
+void PCI_solver::startAlg(model _model_chosen) {
+	model_chosen = _model_chosen;
 
   //nsecs = nprecs = npredCuts = nsuccCuts = nprecBal = 0;
   //root = 0.0;
@@ -186,7 +187,7 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
   outfile <<"\n";
 
 
-	if (s_cutter->finds_constraints(infected, obj.option)) {
+	if (s_cutter->finds_constraints(infected, obj.model_chosen)) {
           //self.tolerances.uppercutoff = min(s_cu)
 		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
 			obj.constraints_counter ++;
