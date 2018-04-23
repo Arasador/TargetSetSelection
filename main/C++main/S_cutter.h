@@ -15,7 +15,8 @@ class S_cutter {
 
   int neighbors_outside_s(const vector<int> &S, int v);
   int S_induced_inequality(const vector<int> &S);
-  bool finds_S_constraints(const vector<int> &new_f);
+  bool finds_S_constraints(const vector<int> &new_f,
+    vector<bool> visited = vector<bool>());
   bool finds_s_model_constraints(vector<bool> &infected_vertices);
   // ----heuristic
   int heuristic_fmin_select_vertex(const vector<int> &new_f);
@@ -47,7 +48,12 @@ class S_cutter {
   bool finds_s_with_domination_constraints(vector<bool> &infected, model model_chosen);
   // new S_smaller
   bool find_S_smaller_new_constraints(vector<bool> &infected, model model_chosen);
-
+  bool S_constraints_recursively(vector<bool> infected, vector<bool> vertices_selected,
+    vector<int> new_f, const vector<int>& selection_order, int position, 
+    model model_chosen, vector<vector<int> >& found_constr_lhs,
+    vector<int>& found_constr_rhs, int max_prev_rhs);
+  bool finds_all_components_S_small(vector<bool> &infected, model model_chosen); 
+  bool viable_new_right_side_constraint(vector<int>& max_rhs_constraints, int prev_rhs);
   // --- variables
   vector<vector<int> > constraints_lhs_res;
   vector<int> constraints_rhs_res;
@@ -159,9 +165,11 @@ int S_cutter::S_induced_inequality(const vector<int> &S) {
 
 //given a set of infected vertices and an f, creates constraints based on
 // the S set of remaining vertices
-bool S_cutter::finds_S_constraints(const vector<int> &new_f) {
+bool S_cutter::finds_S_constraints(const vector<int> &new_f,
+  vector<bool> visited) {
+  if (visited.size() == 0)
+    visited = vector<bool>(N);
   // marks infected vertices as visited
-  vector<bool> visited(N);
   for (int v = 0; v < N; v ++)
     visited[v] = (new_f[v] <= 0);
 
@@ -591,9 +599,11 @@ bool S_cutter::finds_s_with_domination_constraints(vector<bool> &infected,
   return ! constraints_lhs_res.empty();
 }
 
+// RECURSIVE S SMALL
 //###############################################################################
-bool viable_new_right_side_constraint(vector<int>& max_rhs_constraints, int prev_component) {
-  // find max right sided constraint 
+bool S_cutter::viable_new_right_side_constraint(vector<int>& max_rhs_constraints, 
+  int prev_rhs) {
+  // find max right sided constraint
     int argmax = -1, valuemax = -1;
     for (int i = 0; i < constraints_rhs_res.size(); i ++) {
       if (valuemax < constraints_rhs_res[i]) {
@@ -605,66 +615,100 @@ bool viable_new_right_side_constraint(vector<int>& max_rhs_constraints, int prev
         max_rhs_constraints.push_back(i);
       }
     }
-    assert(argmax != -1);
-    // compares max right sided constraint
-    if (prev_rhs[prev_component] > constraints_rhs_res[argmax]) {
-      constraints_rhs_res = prev_rhs;
-      constraints_lhs_res = prev_lhs;
-      return false;
+    if (argmax == -1) {
+      max_rhs_constraints = constraints_rhs_res;
     }
-    return true;
+    return (prev_rhs <= constraints_rhs_res[argmax]);
 }
 
 
-// call a process for each component S created in the process of infecting vertices 
+// call a function for each component S created in the process of infecting vertices
 //randomly
 // TODO: fix this function
-bool S_cutter::S_constraints_recursively(vector<bool> &infected, vector<bool> 
-  vertices_selected, vector<int> new_f, const vector<int>& selection order,
-  int position, model model_chosen) {
-  int N = infected.size();
-  int previous_component = -1, vertex_from_component = -1; 
-  // while can select S's to create new constraints, continues
-  while(can_select_random_component(infected, vertex_from_component)) {
+bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>
+  vertices_selected, vector<int> new_f, const vector<int>& selection_order,
+  int position, model model_chosen, vector<vector<int> >& found_constr_lhs,
+  vector<int>& found_constr_rhs, int max_prev_rhs) {
+  //
+  /*vector<bool> ignore_vertices(N);
+  for (int i = 0; i < N; i ++) {
+    ignore_vertices[i] = ! vertices_selected[i] || infected[i];
+  }//*/
+  for (int i = 0; i < N; i ++) 
+    infected[i] = infected[i] || ! vertices_selected[i];
     //select next vertex
-    int v = select_next_vertex(selection_order, infected, position, model_chosen,
-      new_f);
-    assert(v != -1);
-    infect_one_vertex(v, infected, new_f);
-    for (int i = 0; i < N; i ++) {
-      if (! vertices_selected[i]) {
-        new_f[i] = INFECTED;
-      }
-    }
-    if (! finds_S_constraints(new_f)){
-      break;
-    }
-    if (! viable_new_right_side_constraint) {
-      return true;
-    }
-   
-    for (int i = 0; i < max_size_rhs.size(); i ++) {
-      // selects only vertices in S to go to new function
-      vector<bool> vertices_selected_new_component(N, false);
-      for (auto u: constraints_lhs_res[max_size_rhs[i]]) {
-        vertices_selected_new_component[u] = true;
-      }
-      if (i == 0) {
-        component_selected = max_size_rhs[0];
-        vertex_from_component = constraints_lhs_res[component_selected][0];
-        vertices_selected = vertices_selected_new_component;
-      }
-      S_constraints_recursively(infected, vertices_selected_new_component, 
-        new_f, selection_order, position, model_chosen);
-    }
+  int v = select_next_vertex(selection_order, infected, position, model_chosen,
+    new_f);
+  if (v == -1) return false; 
+  // spreads infection using previous only one universal new_f vector, since
+  // we only infect the connected component defined by "vertices_selected"
+  infect_one_vertex(v, infected, new_f);
+  // since we are using the previous new_f to spread disease, needs to erase
+  // other vertices
+  /*for (int i = 0; i < N; i ++) {
+    ignore_vertices[i] = ! vertices_selected[i] || infected[i];
+  } //*/
+  vector<int> max_size_rhs;
+  if (! finds_S_constraints(new_f, infected)){
+    return false;
   }
+  if (! viable_new_right_side_constraint(max_size_rhs, max_prev_rhs)) {
+    return false;
+  }
+  vector<int> prev_rhs(constraints_rhs_res);
+  vector<vector<int> > prev_lhs(constraints_lhs_res);
+
+  for (auto max_size_constraint: max_size_rhs) {
+    // selects only vertices in S to go to new function
+    vector<bool> vertices_selected_new_component(N, false);
+    for (auto u: prev_lhs[max_size_constraint]) {
+      vertices_selected_new_component[u] = true;
+    }
+    // if did not found any new constraint in next recursive 
+    print_vector(prev_lhs[max_size_constraint], "called on constraint: ");
+    cout << " >= " << prev_rhs[max_size_constraint] << "  --->  " ;
+    if (! S_constraints_recursively(infected, vertices_selected_new_component,
+      new_f, selection_order, position, model_chosen, found_constr_lhs, 
+      found_constr_rhs,  prev_rhs[max_size_constraint])) 
+    {
+      cout << "end ended there" << endl;
+      found_constr_lhs.push_back(prev_lhs[max_size_constraint]);
+      found_constr_rhs.push_back(prev_rhs[max_size_constraint]);
+    }
+    cout << endl;
+
+  }
+  return true;
 }
 
+bool S_cutter::finds_all_components_S_small(vector<bool> &infected,
+  model model_chosen) {
+  vector<int> new_f(f);
+  // gets a vector with the section order of vertices based on the option
+  // weighted or not
+  vector<int> selection_order = weighted_option_selected(model_chosen);
+  //print(selection_order)
+  int position = 0;
+  vector<bool> vertices_selected(N, true);
+  vector<vector<int> > found_constr_lhs;
+  vector<int> found_constr_rhs;
+
+  S_constraints_recursively(infected, vertices_selected, new_f,
+    selection_order, position, model_chosen, found_constr_lhs, found_constr_rhs, -1);
+
+  constraints_lhs_res = found_constr_lhs;
+  constraints_rhs_res = found_constr_rhs;
+  cout << " constraint found: " << endl;
+  print_matrix(constraints_lhs_res, "left part: ");
+  print_vector(constraints_rhs_res, "right part: ");
+
+  return constraints_rhs_res.size() != 0;
+}
 
 
 //##############################################################################
 //this function returns if we found constraints for a smaller S new
-bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected, 
+bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected,
   model model_chosen) {
   vector<int> new_f = infect_graph(infected);
   if (! finds_S_constraints(new_f))
@@ -686,12 +730,17 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected,
     if (! finds_S_constraints(new_f)){
       break;
     }
-    // find max right sided constraint 
+    // find max right sided constraint
     // if left side of the constraint shrinked, returns true and mantain
     //previous constraint
     vector<int> max_size_rhs;
-    if (! viable_new_right_side_constraint(max_size_rhs)) {
+    if (! viable_new_right_side_constraint(max_size_rhs, prev_rhs[component_selected])) {
+      constraints_rhs_res = prev_rhs;
+      constraints_lhs_res = prev_lhs;
       return true;
+    }
+    for (int i = 0; i < max_size_rhs.size(); i ++) {
+
     }
     component_selected = max_size_rhs[0];
     vertex_from_component = constraints_lhs_res[component_selected][0];
@@ -728,6 +777,6 @@ bool S_cutter::finds_constraints(vector<bool> infected, model model_chosen) {
       //*/
     case S_SMALLER_NEW:
       //cout << "---------------S_smaller_new-----------------" << endl;
-      return find_S_smaller_new_constraints(infected, model_chosen);
+      return finds_all_components_S_small(infected, model_chosen);
   }
 }
