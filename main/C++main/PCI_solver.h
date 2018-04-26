@@ -273,6 +273,8 @@ void PCI_solver::setCplexSettings(int timelimit) {
   cplex.setParam(IloCplex::TiLim, timelimit);
   cplex.setParam(IloCplex::RandomSeed, 31415);
   cplex.setOut(env.getNullStream());
+  // mip enphasis 3: CPX_MIPEMPHASIS_BESTBOUND  Emphasize moving best bound
+  cplex.setParam(IloCplex::Param::Emphasis::MIP, 3);
   /*cplex.setParam(IloCplex::CutUp, initial_ub); //Sets the upper cutoff tolerance.
 
     if (vlDisp != 0) {
