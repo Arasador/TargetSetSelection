@@ -20,14 +20,18 @@ void write_output_file (vector<int> objective_values, vector<double> times,
 
 int main (int argc, char** argv) {
   string model_selected = argv[1];
+  cout << boolalpha;
   // reads input file and stores it into components vector
   deque<vector<vector<int> > > components = data_preprocessing(argc, argv);
   // possible selected models
   vector<int> objective_values(NUM_MODELS, 0);
   vector<double> times(NUM_MODELS, 0), gaps(NUM_MODELS, 0);
-  ofstream outfile("out_lazyconstraint.txt", ios::app);
-  outfile << argv[2] << " \n" ;
-  outfile.close();
+
+  #ifdef FILE_S_CUTTER_INFO
+    ofstream outfile("out_lazyconstraint.txt", ios::app);
+    outfile << argv[2] << " \n" ;
+    outfile.close();
+  #endif
   // list of all models we have
   model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
   S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
@@ -42,9 +46,13 @@ int main (int argc, char** argv) {
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0')
         continue;
-      ofstream outfile("out_lazyconstraint.txt", ios::app);
-      outfile << "\nMODEL " << i << "\n";
-      outfile.close();
+
+      #ifdef FILE_S_CUTTER_INFO
+        ofstream outfile("out_lazyconstraint.txt", ios::app);
+        outfile << "\nMODEL " << i << "\n";
+        outfile.close();
+      #endif
+        
       IloEnv env_pci;
       PCI_solver pci_solver(env_pci, adjacency_list, f, w);
       pci_solver.setModelProblem();

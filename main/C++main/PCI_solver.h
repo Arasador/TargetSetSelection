@@ -176,16 +176,17 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 	S_cutter* s_cutter = obj.s_cutter;
   int count_infected = 0;
 
-  ofstream outfile("out_lazyconstraint.txt", ios::app);
-  outfile << obj.lazycall_counter ++ << " callback:\n";
-  outfile << "Objective Value: " << getObjValue() <<"  Gap: " 
-  << getMIPRelativeGap() << " \n"; 
-  outfile << "\n Infected vertices: "  << infected[0];
-  for (int i = 1 ; i < obj.N; i ++) {
-    outfile << ", " << infected[i];
-  }
-  outfile <<"\n";
-
+  #ifdef FILE_S_CUTTER_INFO
+    ofstream outfile("out_lazyconstraint.txt", ios::app);
+    outfile << obj.lazycall_counter ++ << " callback:\n";
+    outfile << "Objective Value: " << getObjValue() <<"  Gap: " 
+      << getMIPRelativeGap() << " \n"; 
+    outfile << "\n Infected vertices: "  << infected[0];
+    for (int i = 1 ; i < obj.N; i ++) {
+      outfile << ", " << infected[i];
+    }
+    outfile <<"\n";
+  #endif
 
 	if (s_cutter->finds_constraints(infected, obj.model_chosen)) {
           //self.tolerances.uppercutoff = min(s_cu)
@@ -197,8 +198,13 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 				cutLhs += obj.x[k];
 			}
       //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
-      outfile << "\nconstraint: " << cutLhs << " >= " << (s_cutter->constraints_rhs_res)[i];
-			add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
+       
+      #ifdef FILE_S_CUTTER_INFO
+        outfile << "\nconstraint: " << cutLhs << " >= " 
+          << (s_cutter->constraints_rhs_res)[i];
+			#endif
+
+      add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
 		}
 	}
 	else {
@@ -207,8 +213,10 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 		for (int i = 0; i < N; i ++)
 			assert(new_f[i] < 0);
 	}
-  outfile << "\n\n";
-  outfile.close();
+  #ifdef FILE_S_CUTTER_INFO
+    outfile << "\n\n";
+    outfile.close();
+  #endif
 }
 
 
