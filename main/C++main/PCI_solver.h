@@ -49,7 +49,7 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
   adjacency_list = _adjacency_list;
   f = _f;
   w = _w;
-	s_cutter = new S_cutter(adjacency_list, f);
+	s_cutter = new S_cutter(adjacency_list, f, w);
   N = f.size();
   lazycall_counter = 0;
 	constraints_counter = 0;
