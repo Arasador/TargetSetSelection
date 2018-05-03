@@ -1,4 +1,5 @@
 #include "includes.h"
+//#define PRINT_LOG
 
 class S_cutter {
   public:
@@ -636,25 +637,26 @@ bool S_cutter::viable_new_right_side_constraint(vector<int>& max_rhs_constraints
 // call a function for each component S created in the process of infecting vertices
 //randomly
 // TODO: fix this function
-
+int counter = 0;
 bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
   vertices_selected, vector<int> new_f, const vector<int>& selection_order,
   int position, vector<vector<int> >& found_constr_lhs,
   vector<int>& found_constr_rhs, int max_prev_rhs, bool& first) {
+  counter ++;
   if (! first) {
     // helps ignore vertices this S hasn't
-    for (int i = 0; i < N; i ++) 
+    for (int i = 0; i < N; i ++) {
       infected[i] = infected[i] || ! vertices_selected[i];
+      new_f[i] = (infected[i]) ? INFECTED : new_f[i];
+    }
     //select next vertex
 
     // if not first do this stuff
     int v = select_next_vertex(selection_order, infected, position);
 
     // if cannot select vertex, returns -1. Meaning the whole S is infected 
-    #line 642 "should still have vertices to select, but didn't"
-    if (v == -1) {
-      return false;
-    }
+    //#line 642 "should still have vertices to select, but didn't"
+    assert (v != -1);
     // spreads infection using previous only one universal new_f vector, since
     // we only infect the connected component defined by "vertices_selected"
     infect_one_vertex(v, infected, new_f);
@@ -689,8 +691,8 @@ bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
       vertices_selected_new_component[u] = true;
     }
     #ifdef PRINT_LOG
-      print_vector(prev_lhs[viable_new_S], "called on constraint: ");
-      cout << " >= " << prev_rhs[viable_new_S] << "  --->  " ;
+      print_vector(prev_lhs[viable_new_S], to_string(prev_rhs[viable_new_S]) + " <=");
+      cout << "  counter "<< counter <<"--->  " ;
     #endif
     // if did not found any new constraint in next recursive
     if (! S_constraints_recursively(infected, vertices_selected_new_component,
@@ -704,10 +706,10 @@ bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
       found_constr_lhs.push_back(prev_lhs[viable_new_S]);
       found_constr_rhs.push_back(prev_rhs[viable_new_S]);
     }
+    counter --;
     #ifdef PRINT_LOG
     cout << endl;
     #endif
-
   }
   return true;
 }
