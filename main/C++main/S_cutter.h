@@ -10,7 +10,8 @@ class S_cutter {
   vector<vector<int> > adjacency_list;
   vector<vector<bool> > adjacency_matrix;
   vector<int> f, w;
-  int N;
+  vector<bool> current_ub;
+  int N, ub_val;
 
   // ----------------methods---------------
 
@@ -53,7 +54,7 @@ class S_cutter {
   bool S_constraints_recursively(vector<bool> infected, vector<bool>& 
     vertices_selected, vector<int> new_f, const vector<int>& selection_order,
     int position, vector<vector<int> >& found_constr_lhs,
-    vector<int>& found_constr_rhs, int max_prev_rhs, bool& first);
+    vector<int>& found_constr_rhs, int max_prev_rhs, bool& first, vector<bool>& upper_bound);
 
   bool finds_all_components_S_small(vector<bool> &infected, model model_chosen); 
   bool viable_new_right_side_constraint(vector<int>& max_rhs_constraints, int prev_rhs);
@@ -99,6 +100,9 @@ S_cutter::S_cutter(vector<vector<int> > _adjacency_list, vector<int> _f,
   f = _f;
   w = _w;
   N = f.size();
+  current_ub = vector<bool>(N, true);
+  ub_val = 0;
+  for (auto weight: w) ub_val += weight;
   variables_used = vector<int>(N);
   v_weights = vector<float>(N);
   variables_use_counter = 0;
@@ -641,7 +645,7 @@ int counter = 0;
 bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
   vertices_selected, vector<int> new_f, const vector<int>& selection_order,
   int position, vector<vector<int> >& found_constr_lhs,
-  vector<int>& found_constr_rhs, int max_prev_rhs, bool& first) {
+  vector<int>& found_constr_rhs, int max_prev_rhs, bool& first, vector<bool>& upper_bound) {
   counter ++;
   if (! first) {
     // helps ignore vertices this S hasn't
@@ -653,10 +657,10 @@ bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
 
     // if not first do this stuff
     int v = select_next_vertex(selection_order, infected, position);
-
     // if cannot select vertex, returns -1. Meaning the whole S is infected 
     //#line 642 "should still have vertices to select, but didn't"
     assert (v != -1);
+    upper_bound[v] = true;
     // spreads infection using previous only one universal new_f vector, since
     // we only infect the connected component defined by "vertices_selected"
     infect_one_vertex(v, infected, new_f);
@@ -677,6 +681,8 @@ bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
   vector<int> viable_new_S_constraints; 
   if (! viable_new_right_side_constraint(viable_new_S_constraints, 
     max_prev_rhs)) {
+    for (int i = 0; i < N; i ++)
+      upper_bound[i] = upper_bound[i] || vertices_selected[i];
     return false;
   }
   vector<int> prev_rhs(constraints_rhs_res);
@@ -697,7 +703,7 @@ bool S_cutter::S_constraints_recursively(vector<bool> infected, vector<bool>&
     // if did not found any new constraint in next recursive
     if (! S_constraints_recursively(infected, vertices_selected_new_component,
       new_f, selection_order, position, found_constr_lhs, 
-      found_constr_rhs,  prev_rhs[viable_new_S], first)) 
+      found_constr_rhs,  prev_rhs[viable_new_S], first, upper_bound)) 
     {
       #ifdef PRINT_LOG
        cout << "end ended there" << endl; 
@@ -726,11 +732,24 @@ bool S_cutter::finds_all_components_S_small(vector<bool> &infected,
   vector<vector<int> > found_constr_lhs;
   vector<int> found_constr_rhs;
   bool first = true;
+  vector<bool> upper_bound(infected);
   S_constraints_recursively(infected, vertices_selected, new_f, selection_order,
-   position, found_constr_lhs, found_constr_rhs, -1, first);
+   position, found_constr_lhs, found_constr_rhs, -1, first, upper_bound);
   //Cplex.setParam(IloCplex::CutUp, initial_ub);
   constraints_lhs_res = found_constr_lhs;
   constraints_rhs_res = found_constr_rhs;
+  int ub_curr_value = 0;
+  for (int i = 0; i < N; i ++) {
+    if (upper_bound[i]) {
+      ub_curr_value += w[i];
+    } 
+  }
+  //cout << "upper_bound " << ub_curr_value << endl;
+  if (ub_curr_value < ub_val) {
+    ub_val = ub_curr_value;
+    current_ub = upper_bound;
+  }
+
   #ifdef PRINT_LOG
     cout << " constraint found: " << endl;
     print_matrix(constraints_lhs_res, "left part: ");

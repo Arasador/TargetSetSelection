@@ -64,7 +64,7 @@ int main (int argc, char** argv) {
         pci_solver.solveProblem();
         pci_solver.endAlg(objective_values[i], times[i], gaps[i]);
       } catch (IloException& ex) {
-        pci_solver.Texception();
+        pci_solver.Texception(objective_values[i], times[i], gaps[i]);
       }
     }
   }
