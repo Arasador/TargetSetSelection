@@ -40,3 +40,5 @@ typedef vector<vector<bool> > vectorbool2;
 //typedef vector<int>::iterator vector_it;
 
 #define TIMELIMIT 300
+//#define PRINT_LOG
+#define FILE_S_CUTTER_INFO

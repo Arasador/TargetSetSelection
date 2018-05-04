@@ -19,6 +19,8 @@ class PCI_solver {
 		IloNumVarArray x;
 		IloNumArray _x;
 		S_cutter* s_cutter;
+    vector<bool> ub_vertices;
+    int ub;
 	  //IloNum root;
 	  //IloNum ub;
   	IloObjective objective_function;
@@ -33,7 +35,7 @@ class PCI_solver {
     void setCplexSettings (int timelimit);
     void startAlg (model _model_chosen);
     void endAlg (int &objective_value, double &times, double &gap);
-    void Texception ();
+    void Texception (int &objective_value, double &times, double &gap);
     void initial_constraints_v_infection (int initial_v);
     void add_initial_constraints_neighbors();
 };
@@ -49,8 +51,11 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
   adjacency_list = _adjacency_list;
   f = _f;
   w = _w;
-	s_cutter = new S_cutter(adjacency_list, f);
+	s_cutter = new S_cutter(adjacency_list, f, w);
   N = f.size();
+  ub_vertices = vector<bool>(N, true);
+  ub = 0;
+  for (auto weight: w) ub += weight;
   lazycall_counter = 0;
 	constraints_counter = 0;
   adjacency_matrix = vector<vector<bool> >(N, vector<bool>(N, false));
@@ -149,13 +154,20 @@ void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
 }
 
 // exception
-void PCI_solver::Texception() {
+void PCI_solver::Texception(int &objective_value, double &times, double &gap) {
   //double elapsedTime = timer.getTime();
   //printf("%s ; %.2f ; %.2f ; %.2f ; %.2f ; %d ; %d ; %d ; %d ; %d ; %d ; %d ;
   //%d ; %d ; %d\n", filename.data(), cplex.getBestObjValue(), 100 *
   //(1 - root / ub), 100 * (1 - cplex.getBestObjValue() / ub), elapsedTime,
   //(int) cplex.getNnodes(), secCounter, precCounter, lifoCounter, sCapCounter,
   //iCapCounter, pCapCounter, rCapCounter, userCalls, lazyCalls);
+  cout << "Final obj value: " << ub << endl;
+  cout << "Final gap: 0 (cutted off result) " << endl;
+  cout << "Time: " << cplex.getTime() << endl;
+  cplex.exportModel ("lpex1.lp");
+  objective_value += ub;
+  gap = 0;
+  times += cplex.getTime();
 }
 
 // lazycallback adds new constraints depending on the current integer solution
@@ -176,18 +188,29 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 	S_cutter* s_cutter = obj.s_cutter;
   int count_infected = 0;
 
-  ofstream outfile("out_lazyconstraint.txt", ios::app);
-  outfile << obj.lazycall_counter ++ << " callback:\n";
-  outfile << "Objective Value: " << getObjValue() <<"  Gap: " 
-  << getMIPRelativeGap() << " \n"; 
-  outfile << "\n Infected vertices: "  << infected[0];
-  for (int i = 1 ; i < obj.N; i ++) {
-    outfile << ", " << infected[i];
-  }
-  outfile <<"\n";
-
+  #ifdef FILE_S_CUTTER_INFO
+    ofstream outfile("out_lazyconstraint.txt", ios::app);
+    outfile << obj.lazycall_counter ++ << " callback:\n";
+  #endif
 
 	if (s_cutter->finds_constraints(infected, obj.model_chosen)) {
+    // if found better upper bounds, updates ub and ub_vertices
+    if (obj.ub > s_cutter->ub_val) {
+      obj.ub = s_cutter->ub_val;
+      obj.ub_vertices = s_cutter->current_ub;
+      obj.cplex.setParam(IloCplex::CutUp, obj.ub - 1);
+      //cout <<  obj.ub << endl;
+    }
+    #ifdef FILE_S_CUTTER_INFO
+      outfile << "Objective Value: " << getObjValue() <<"  Gap: " 
+        << getMIPRelativeGap() << "   UpperBound Found: " << s_cutter->ub_val << " \n"; 
+      outfile << "\n Infected vertices: "  << infected[0];
+      for (int i = 1 ; i < obj.N; i ++) {
+        outfile << ", " << infected[i];
+      }
+      outfile <<"\n";
+    #endif
+    
           //self.tolerances.uppercutoff = min(s_cu)
 		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
 			obj.constraints_counter ++;
@@ -197,8 +220,13 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 				cutLhs += obj.x[k];
 			}
       //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
-      outfile << "\nconstraint: " << cutLhs << " >= " << (s_cutter->constraints_rhs_res)[i];
-			add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
+       
+      #ifdef FILE_S_CUTTER_INFO
+        outfile << "\nconstraint: " << cutLhs << " >= " 
+          << (s_cutter->constraints_rhs_res)[i];
+			#endif
+
+      add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
 		}
 	}
 	else {
@@ -207,8 +235,10 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
 		for (int i = 0; i < N; i ++)
 			assert(new_f[i] < 0);
 	}
-  outfile << "\n\n";
-  outfile.close();
+  #ifdef FILE_S_CUTTER_INFO
+    outfile << "\n\n";
+    outfile.close();
+  #endif
 }
 
 
@@ -273,6 +303,8 @@ void PCI_solver::setCplexSettings(int timelimit) {
   cplex.setParam(IloCplex::TiLim, timelimit);
   cplex.setParam(IloCplex::RandomSeed, 31415);
   cplex.setOut(env.getNullStream());
+  // mip enphasis 3: CPX_MIPEMPHASIS_BESTBOUND  Emphasize moving best bound
+  cplex.setParam(IloCplex::Param::Emphasis::MIP, 3);
   /*cplex.setParam(IloCplex::CutUp, initial_ub); //Sets the upper cutoff tolerance.
 
     if (vlDisp != 0) {
@@ -336,3 +368,4 @@ void PCI_solver::setCplexSettings(int timelimit) {
     cplex.setParam(IloCplex::ZeroHalfCuts, -1);
   /*/
 }
+
