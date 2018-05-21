@@ -52,7 +52,7 @@ int main (int argc, char** argv) {
         outfile << "\nMODEL " << i << "\n";
         outfile.close();
       #endif
-        
+
       IloEnv env_pci;
       PCI_solver pci_solver(env_pci, adjacency_list, f, w);
       pci_solver.setModelProblem();
