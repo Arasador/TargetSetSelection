@@ -8,7 +8,7 @@ class PCI_solver {
 	  vector<vector<int> > adjacency_list;
 	  vector<vector<bool> > adjacency_matrix;
 	  vector<int> f, w;
-	  int N, M, constraints_counter, lazycall_counter;
+	  int N, constraints_counter, lazycall_counter;
     model model_chosen;
 		IloNum start_time;
 	  //int initial_ub; //initial lower bound (cost of a valid tour)
@@ -101,7 +101,7 @@ int PCI_solver::setModelProblem () {
   objective_function = IloAdd(c_model, IloMinimize(env, expr_obj_fun));
   //expr_obj_fun.end();
 
-   // first constraint
+  // first constraint
   vector<bool> v_aux(N, true);
   IloExpr expr_first_const = create_expression(v_aux);
   IloRange ctrnt = expr_first_const >= (*min_element(f.begin(), f.end()));
@@ -128,7 +128,7 @@ int PCI_solver::solveProblem () {
   return 0;
 }
 
-// sets all initial parameters
+//93 sets all initial parameters
 void PCI_solver::startAlg(model _model_chosen) {
 	model_chosen = _model_chosen;
 
