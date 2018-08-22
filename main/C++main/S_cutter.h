@@ -805,6 +805,7 @@ bool S_cutter::find_S_smaller_new_constraints(vector<bool> &infected,
 //##############################################################################
 // selectes which model will run
 bool S_cutter::finds_constraints(vector<bool> infected, model model_chosen) {
+  cout << "Begin s_cutter" << endl;
   switch (model_chosen) {
     case S_MODEL:
       //cout << "---------------S_model-----------------" << endl;
@@ -832,6 +833,6 @@ bool S_cutter::finds_constraints(vector<bool> infected, model model_chosen) {
       //cout << "---------------S_smaller_new-----------------" << endl;
       return finds_all_components_S_small(infected, model_chosen);
       //return find_S_smaller_new_constraints(infected, model_chosen);
-
   }
+  cout << "End s_cutter" << endl;
 }

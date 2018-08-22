@@ -18,7 +18,17 @@ void write_output_file (vector<int> objective_values, vector<double> times,
   outfile.close();
 }
 
+void get_input_from_component(int i, deque<vector<vector<int>>>& components,
+  vector<vector<int>>& adjacency_list, vector<int>& f, vector<int>& w) {
+  adjacency_list = components[i];
+  f = adjacency_list[adjacency_list.size() - 2];
+  w = adjacency_list[adjacency_list.size() - 1];
+  adjacency_list.pop_back();
+  adjacency_list.pop_back();
+}
+
 int main (int argc, char** argv) {
+  // gets models selected from std input cmd line
   string model_selected = argv[1];
   cout << boolalpha;
   // reads input file and stores it into components vector
@@ -35,24 +45,20 @@ int main (int argc, char** argv) {
   // list of all models we have
   model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
   S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
-  for (int i = 0; i < components.size(); i ++) {
 
-    vector<vector<int> > adjacency_list = components[i];
-    vector<int> f = adjacency_list[adjacency_list.size() - 2];
-    vector<int> w = adjacency_list[adjacency_list.size() - 1];
-    adjacency_list.pop_back();
-    adjacency_list.pop_back();
-
+  for (int j = 0; j < components.size(); j ++) {
+    cout << j << " instance out of " << components.size() << endl;
+    vector<vector<int> > adjacency_list;
+    vector<int> f , w;
+    get_input_from_component(j, components, adjacency_list, f, w);
     for (int i = 0; i < NUM_MODELS; i ++) {
-      if (model_selected[i] == '0')
-        continue;
-
+      if (model_selected[i] == '0') continue;
       #ifdef FILE_S_CUTTER_INFO
         ofstream outfile("out_lazyconstraint.txt", ios::app);
         outfile << "\nMODEL " << i << "\n";
         outfile.close();
       #endif
-
+      // builds cplex model
       IloEnv env_pci;
       PCI_solver pci_solver(env_pci, adjacency_list, f, w);
       pci_solver.setModelProblem();
@@ -63,14 +69,13 @@ int main (int argc, char** argv) {
         //one_cut.enforceIntVars();
         pci_solver.solveProblem();
         pci_solver.endAlg(objective_values[i], times[i], gaps[i]);
+        cout << "ended" << endl;
+
       } catch (IloException& ex) {
         pci_solver.Texception(objective_values[i], times[i], gaps[i]);
       }
     }
   }
-  //cout << "objective values are the same? -" << endl;
-  //for (int i = 0; i < objective_values.size() - 1; i ++)
-    //assert(objective_values[i] == objective_values[i + 1]);
   write_output_file(objective_values, times, gaps, argv[1], argv[2],
     "table_COLORED.dat");
 }

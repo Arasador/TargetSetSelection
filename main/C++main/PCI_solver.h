@@ -1,14 +1,13 @@
-#include "S_cutter.h"
+#include "Separation.h"
 
 using namespace std;
 
 class PCI_solver {
   public:
 		//bool rlModel;
-	  vector<vector<int> > adjacency_list;
-	  vector<vector<bool> > adjacency_matrix;
+	  vector<vector<int>> adjacency_list;
 	  vector<int> f, w;
-	  int N, constraints_counter, lazycall_counter;
+	  int N, constraints_counter, lazycall_counter, usercall_counter;
     model model_chosen;
 		IloNum start_time;
 	  //int initial_ub; //initial lower bound (cost of a valid tour)
@@ -19,15 +18,15 @@ class PCI_solver {
 		IloNumVarArray x;
 		IloNumArray _x;
 		S_cutter* s_cutter;
+    Separation* separation;
+
     vector<bool> ub_vertices;
     int ub;
     IloExpr expr_obj_fun;
-	  //IloNum root;
-	  //IloNum ub;
   	IloObjective objective_function;
   	IloRangeArray constraints;
     // ----------------------methods
-    PCI_solver (IloEnv _env, vector<vector<int> > _adjacency_list, vector<int>
+    PCI_solver (IloEnv _env, vector<vector<int>> _adjacency_list, vector<int>
       _f, vector<int> _w);
     ~PCI_solver ();
     virtual int setModelProblem ();
@@ -42,7 +41,7 @@ class PCI_solver {
 };
 
 //--------------- Constructor
-PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
+PCI_solver::PCI_solver(IloEnv _env, vector<vector<int>> _adjacency_list,
 	vector<int> _f, vector<int> _w) {
   // initializes cplex enviroment and model
   env = _env;
@@ -53,23 +52,22 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int> > _adjacency_list,
   f = _f;
   w = _w;
 	s_cutter = new S_cutter(adjacency_list, f, w);
+  separation = new Separation(adjacency_list, f, w);
+
   N = f.size();
   ub_vertices = vector<bool>(N, true);
   ub = 0;
   for (auto weight: w) ub += weight;
   lazycall_counter = 0;
+  usercall_counter = 0;
 	constraints_counter = 0;
-  adjacency_matrix = vector<vector<bool> >(N, vector<bool>(N, false));
-  for (int v = 0; v < N; v ++) {
-    for (int i = 0; i < adjacency_list[v].size(); i ++) {
-      int u = adjacency_list[v][i];
-      adjacency_matrix[v][u] = true;
-      adjacency_matrix[u][v] = true;
-    }
-  }
 }
 
-PCI_solver::~PCI_solver () {}
+PCI_solver::~PCI_solver () {
+  cout << "pci destructor" << endl;
+  delete s_cutter;
+  delete separation;
+}
 
 IloExpr PCI_solver::create_expression (vector<bool> selected_var) {
   IloExpr expr(env);
@@ -171,81 +169,6 @@ void PCI_solver::Texception(int &objective_value, double &times, double &gap) {
   times += cplex.getTime();
 }
 
-// lazycallback adds new constraints depending on the current integer solution
-// founds in the program
-ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
-  IloInt i;
-  IloEnv masterEnv = getEnv();
-  int N = obj.N; //obj.x.getSize();
-  // Get the current x solution
-
-  IloNumArray xSol(masterEnv);
-	vector<bool> infected(obj.N, false);
-  getValues(xSol, obj.x);
-	for (int i = 0; i < obj.N; i ++) {
-		infected[i] = ((int) round(xSol[i])) == 1;
-	}
-	bool found_constraints = false;
-	S_cutter* s_cutter = obj.s_cutter;
-  int count_infected = 0;
-
-  #ifdef FILE_S_CUTTER_INFO
-    ofstream outfile("out_lazyconstraint.txt", ios::app);
-    outfile << obj.lazycall_counter ++ << " callback:\n";
-  #endif
-
-
-
-
-	if (s_cutter->finds_constraints(infected, obj.model_chosen)) {
-    // if found better upper bounds, updates ub and ub_vertices
-
-
-          //self.tolerances.uppercutoff = min(s_cu)
-		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
-			obj.constraints_counter ++;
-			IloExpr cutLhs(masterEnv);
-			for (int j = 0; j < (s_cutter->constraints_lhs_res[i]).size(); j ++){
-				int k = (s_cutter->constraints_lhs_res)[i][j];
-				cutLhs += obj.x[k];
-			}
-      //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
-
-      #ifdef FILE_S_CUTTER_INFO
-        outfile << "\nconstraint: " << cutLhs << " >= "
-          << (s_cutter->constraints_rhs_res)[i];
-			#endif
-
-      add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
-		}
-	}
-	else {
-    // Asserts it is a valid solution found, if did not added constraints
-		vector<int> new_f = s_cutter->infect_graph(infected);
-		for (int i = 0; i < N; i ++)
-			assert(new_f[i] < 0);
-	}
-
-  if (obj.ub > s_cutter->ub_val) {
-    obj.ub = s_cutter->ub_val;
-    obj.ub_vertices = s_cutter->current_ub;
-    //obj.cplex.setParam(IloCplex::CutUp, (double) obj.ub - 1);
-    add(obj.expr_obj_fun <= obj.ub - 1);
-    //cout <<  obj.ub << endl;
-  }
-
-
-  #ifdef FILE_S_CUTTER_INFO
-  outfile << "\n\n";
-    outfile << "Objective Value: " << getObjValue() <<"  Gap: "
-      << getMIPRelativeGap() << "   getBestObjValue:  "<< getBestObjValue()<< "   UpperBound Found: " << s_cutter->ub_val <<
-      "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
-    outfile.close();
-  #endif
-
-
-
-}
 
 
 // added initial constraints v, so starts with a more robust model
@@ -303,8 +226,125 @@ void PCI_solver::add_initial_constraints_neighbors() {
   }
 }
 
+// lazycallback adds new constraints depending on the current integer solution
+// founds in the program
+ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
+  IloInt i;
+  IloEnv masterEnv = getEnv();
+  int N = obj.N; //obj.x.getSize();
+  // Get the current x solution
+
+  IloNumArray xSol(masterEnv);
+	vector<bool> infected(N, false);
+  getValues(xSol, obj.x);
+	for (int i = 0; i < N; i ++) {
+		infected[i] = ((int) round(xSol[i])) == 1;
+	}
+	bool found_constraints = false;
+	S_cutter* s_cutter = obj.s_cutter;
+  int count_infected = 0;
+
+  #ifdef FILE_S_CUTTER_INFO
+    ofstream outfile("out_lazyconstraint.txt", ios::app);
+    outfile << obj.lazycall_counter ++ << " callback:\n";
+  #endif
+	if (s_cutter->finds_constraints(infected, obj.model_chosen)) {
+    // if found better upper bounds, updates ub and ub_vertices
+          //self.tolerances.uppercutoff = min(s_cu)
+		for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
+			obj.constraints_counter ++;
+			IloExpr cutLhs(masterEnv);
+			for (int j = 0; j < (s_cutter->constraints_lhs_res[i]).size(); j ++){
+				int k = (s_cutter->constraints_lhs_res)[i][j];
+				cutLhs += obj.x[k];
+			}
+      //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
+
+      #ifdef FILE_S_CUTTER_INFO
+        outfile << "\nconstraint: " << cutLhs << " >= "
+          << (s_cutter->constraints_rhs_res)[i];
+			#endif
+
+      add(cutLhs >= (s_cutter->constraints_rhs_res)[i]).end();
+		}
+	}
+	else {
+
+    // Asserts it is a valid solution found, if did not added constraints
+		vector<int> new_f = s_cutter->infect_graph(infected);
+		for (int i = 0; i < N; i ++)
+			assert(new_f[i] < 0);
+	}
+
+  if (obj.ub > s_cutter->ub_val) {
+    obj.ub = s_cutter->ub_val;
+    obj.ub_vertices = s_cutter->current_ub;
+    //obj.cplex.setParam(IloCplex::CutUp, (double) obj.ub - 1);
+    add(obj.expr_obj_fun <= obj.ub - 1);
+    //cout <<  obj.ub << endl;
+  }
+
+
+  #ifdef FILE_S_CUTTER_INFO
+  outfile << "\n\n";
+    outfile << "Objective Value: " << getObjValue() <<"  Gap: "
+      << getMIPRelativeGap() << "   getBestObjValue:  "<< getBestObjValue()<< "   UpperBound Found: " << s_cutter->ub_val <<
+      "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
+    outfile.close();
+  #endif
+}
+
+
+ILOUSERCUTCALLBACK1(userCallback, PCI_solver&, obj) {
+  IloInt i;
+  IloEnv masterEnv = getEnv();
+  int N = obj.N; //obj.x.getSize();
+  // Get the current x solution
+  IloNumArray xSol(masterEnv);
+	vector<double> infected(N, false);
+  getValues(xSol, obj.x);
+	for (int i = 0; i < N; i ++) {
+		infected[i] = xSol[i];
+	}
+  #ifdef FILE_S_CUTTER_INFO
+    ofstream outfile("out_lazyconstraint.txt", ios::app);
+    outfile << obj.usercall_counter ++ << " USER callback:\nInfected";
+    for (auto e: infected) outfile << e << " ";
+    outfile << "\n";
+  #endif
+  Separation* separation = obj.separation;
+  if (separation->finds_constraints(infected)) {
+    cout << "entered" << endl;
+    // if found better upper bounds, updates ub and ub_vertices
+		for (int i = 0; i < (separation->constraints_rhs_res).size(); i ++) {
+			IloExpr cutLhs(masterEnv);
+			for (int j = 0; j < (separation->constraints_lhs_res[i]).size(); j ++){
+				int k = (separation->constraints_lhs_res)[i][j];
+				cutLhs += obj.x[k];
+			}
+      //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
+
+      #ifdef FILE_S_CUTTER_INFO
+        outfile << "\nconstraint: " << cutLhs << " >= "
+          << (separation->constraints_rhs_res)[i];
+			#endif
+      //*/
+      add(cutLhs >= (separation->constraints_rhs_res)[i]).end();
+		}
+	}
+  #ifdef FILE_S_CUTTER_INFO
+  outfile << "\n\n";
+    outfile << "Objective Value: " << getObjValue() <<"  Gap: "
+      << getMIPRelativeGap() << "   getBestObjValue:  "<< getBestObjValue() <<
+      "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
+    outfile.close();
+  #endif
+}
+
+
 // set cplex parameters
 void PCI_solver::setCplexSettings(int timelimit) {
+  //cplex.use(userCallback(env, *this));
   cplex.use(lazyCallback(env, *this));
   cplex.setParam(IloCplex::TiLim, timelimit);
   cplex.setParam(IloCplex::RandomSeed, 31415);
