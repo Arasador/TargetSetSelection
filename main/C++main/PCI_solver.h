@@ -292,6 +292,8 @@ ILOLAZYCONSTRAINTCALLBACK1(lazyCallback, PCI_solver&, obj){
       "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
     outfile.close();
   #endif
+
+
 }
 
 
@@ -306,14 +308,15 @@ ILOUSERCUTCALLBACK1(userCallback, PCI_solver&, obj) {
 	for (int i = 0; i < N; i ++) {
 		infected[i] = xSol[i];
 	}
-  #ifdef FILE_S_CUTTER_INFO
-    ofstream outfile("out_lazyconstraint.txt", ios::app);
-    outfile << obj.usercall_counter ++ << " USER callback:\nInfected";
-    for (auto e: infected) outfile << e << " ";
-    outfile << "\n";
-  #endif
+
   Separation* separation = obj.separation;
   if (separation->finds_constraints(infected)) {
+    #ifdef FILE_S_CUTTER_INFO
+      ofstream outfile("out_lazyconstraint.txt", ios::app);
+      outfile << obj.usercall_counter ++ << " USER callback:\nInfected";
+      for (auto e: infected) outfile << e << " ";
+      outfile << "\n";
+    #endif
     cout << "entered" << endl;
     // if found better upper bounds, updates ub and ub_vertices
 		for (int i = 0; i < (separation->constraints_rhs_res).size(); i ++) {
@@ -331,20 +334,23 @@ ILOUSERCUTCALLBACK1(userCallback, PCI_solver&, obj) {
       //*/
       add(cutLhs >= (separation->constraints_rhs_res)[i]).end();
 		}
+    #ifdef FILE_S_CUTTER_INFO
+    outfile << "\n\n";
+      outfile << "Objective Value: " << getObjValue() <<"  Gap: "
+        << getMIPRelativeGap() << "   getBestObjValue:  "<< getBestObjValue() <<
+        "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
+      outfile.close();
+    #endif
 	}
-  #ifdef FILE_S_CUTTER_INFO
-  outfile << "\n\n";
-    outfile << "Objective Value: " << getObjValue() <<"  Gap: "
-      << getMIPRelativeGap() << "   getBestObjValue:  "<< getBestObjValue() <<
-      "  Global UpperBound: " << obj.ub << "  IloCplex UpperBound: " << obj.cplex.getParam(IloCplex::CutUp) <<  " \n";
-    outfile.close();
-  #endif
+
 }
 
 
 // set cplex parameters
 void PCI_solver::setCplexSettings(int timelimit) {
-  //cplex.use(userCallback(env, *this));
+  #ifdef USERCUT
+    cplex.use(userCallback(env, *this));
+  #endif
   cplex.use(lazyCallback(env, *this));
   cplex.setParam(IloCplex::TiLim, timelimit);
   cplex.setParam(IloCplex::RandomSeed, 31415);

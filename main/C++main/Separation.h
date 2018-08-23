@@ -1,13 +1,14 @@
 #include <iostream>
 #include <algorithm>
 #include "S_cutter.h"
+#include "ClusterHCS.cpp"
 
 using namespace std;
 
 class Separation {
 public:
-
-	vector<vector<int> > adjacency_list, constraints_lhs_res;
+	vector<vector<int>> adjacency_list, constraints_lhs_res;
+	vector<vector<bool>> cluster_components;
 	vector<int> f, w, num_neightbors, constraints_rhs_res;
 	vector<double> costs;
 	int N;
@@ -30,12 +31,13 @@ public:
 	bool finds_constraints(vector<double> infected);
 };
 
-Separation::Separation(vector<vector<int> > _adjacency_list,
+Separation::Separation(vector<vector<int>> _adjacency_list,
 	vector<int> _f, vector<int> _w) {
 	adjacency_list = _adjacency_list;
 	f = _f;
 	w = _w;
 	N = _f.size();
+	//cluster_components = HCS(adjacency_list);
 }
 
 Separation::~Separation() {}

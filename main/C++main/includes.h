@@ -41,3 +41,4 @@ typedef vector<vector<bool> > vectorbool2;
 #define TIMELIMIT 300
 //#define PRINT_LOG
 #define FILE_S_CUTTER_INFO
+#define USERCUT

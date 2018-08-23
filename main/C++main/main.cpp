@@ -51,6 +51,7 @@ int main (int argc, char** argv) {
     vector<vector<int> > adjacency_list;
     vector<int> f , w;
     get_input_from_component(j, components, adjacency_list, f, w);
+    //HCS(adjacency_list);  }/*
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0') continue;
       #ifdef FILE_S_CUTTER_INFO
@@ -77,5 +78,5 @@ int main (int argc, char** argv) {
     }
   }
   write_output_file(objective_values, times, gaps, argv[1], argv[2],
-    "table_COLORED.dat");
+    "table_COLORED.dat"); //*/
 }
