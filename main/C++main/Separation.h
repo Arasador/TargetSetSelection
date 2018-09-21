@@ -19,14 +19,17 @@ public:
 	int neighbors_outside_s_bool(const vector<bool> &S, int v);
 	int S_induced_inequality(const vector<int> &S);
 	int S_induced_inequality_bool(const vector<bool> &S);
-	int initial_vertex_selection(vector<double>& infected);
+	int initial_vertex_selection(vector<double>& infected,
+		 const vector<bool>& cluster = vector<bool>());
 	void add_to_neighbors(vector<bool>& neighbors_S, int v0);
 	int get_max_S_neighbor(const vector<bool> &neighbors, vector<bool>& S, int& rhs, const vector<double>& infected);
-	void initial_heuristic(vector<double>& infected);
+	void initial_heuristic(vector<double>& infected,
+		const vector<bool>& cluster = vector<bool>());
 	void check_if_violates(vector<int> S, vector<int>& rhs,
 		vector<vector<int>>& lhs, vector<double>& infected);
 	void generates_Ss_and_tests(int i, vector<int>& S, int N, vector<int>& rhs,
-		vector<vector<int>>& lhs, vector<double>& infected);
+		vector<vector<int>>& lhs, vector<double>& infected,
+		const vector<bool>& cluster = vector<int>()));
 	void tests_all_Ss(vector<double>& infected);
 	bool finds_constraints(vector<double> infected);
 };
@@ -103,19 +106,23 @@ int get_argmin(vector<T>& v, vector<bool>& selected) {
 }
 //*/
 // for now, selects vertex with min cost
-int Separation::initial_vertex_selection(vector<double>& infected) {
-	/*double min = infected[0];
-	int argmin = 0;
-	for (int i = 1; i < N; i ++) {
+int Separation::initial_vertex_selection(vector<double>& infected,
+	const vector<bool>& cluster = vector<bool>()) {
+
+	double min = -1; // all numbers must be non negative
+	int argmin = -1;
+	for (int i = 0; i < N; i ++) {
+		if (! cluster.empty() && ! cluster[i]) continue;
 		if (min > infected[i]) {
 			min = infected[i];
 			argmin = i;
 		}
 	}
-	 //*/
-	auto it = min_element(infected.begin(), infected.end());
-	assert(argmin == it -infected.begin() );
-	return it - infected.begin();
+	assert(argmin != -1);
+	return argmin;
+	//auto it = min_element(infected.begin(), infected.end());
+	//assert(argmin == it -infected.begin() );
+	//return it - infected.begin();
 }
 
 // adds neighbors of a given vertex v0 as neighbors of S
@@ -154,7 +161,8 @@ double get_c0(vector<T>& v) {
 	return c0;
 }
 
-void Separation::initial_heuristic(vector<double>& infected) {
+void Separation::initial_heuristic(vector<double>& infected,
+	const vector<bool>& cluster = vector<bool>()) {
 	// initializes vectors
 	if (! constraints_lhs_res.empty()) {
 		constraints_lhs_res.clear();
@@ -219,8 +227,10 @@ void Separation::check_if_violates(vector<int> S, vector<int>& rhs,
 	}
 }
 
+static vector<int> DEFAULT_VECTOR();
+
 void Separation::generates_Ss_and_tests(int i, vector<int>& S, int N, vector<int>& rhs,
-	vector<vector<int>>& lhs, vector<double>& infected) {
+	vector<vector<int>>& lhs, vector<double>& infected, const vector<bool>& cluster = vector<int>()) {
 	if (i >= N) {
 		if (S.empty()) return;
 		print_vector(S, "S: ");
@@ -229,6 +239,8 @@ void Separation::generates_Ss_and_tests(int i, vector<int>& S, int N, vector<int
 		return;
 	}
 	generates_Ss_and_tests(i + 1, S, N, rhs, lhs, infected);
+	// if restricting to clusters, if is not in cluster, returns
+	if (cluster.empty() || !cluster[i]) return;
 	S.push_back(i);
 	generates_Ss_and_tests(i + 1, S, N, rhs, lhs, infected);
 	S.pop_back();
@@ -237,8 +249,20 @@ void Separation::generates_Ss_and_tests(int i, vector<int>& S, int N, vector<int
 void Separation::tests_all_Ss(vector<double>& infected) {
 	vector<int> S, rhs_violated_s;
 	vector<vector<int>> lhs_violated_s;
-	generates_Ss_and_tests(0, S, infected.size(), rhs_violated_s, lhs_violated_s, infected);
+	generates_Ss_and_tests(0, S, infected.size(), rhs_violated_s, lhs_violated_s,
+	infected);
 }
+
+void cluster_find_all(vector<double>& infected, const vector<bool>& cluster) {
+	vector<int> S, rhs_violated_s;
+	vector<vector<int>> lhs_violated_s;
+	generates_Ss_and_tests(0, S, infected.size(), rhs_violated_s, lhs_violated_s,
+	infected, cluster);
+	constraints_lhs_res = lhs_violated_s;;
+	constraints_rhs_res = rhs_violated_s;
+}
+
+
 
 bool Separation::finds_constraints(vector<double> infected) {
 	//tests_all_Ss(infected);

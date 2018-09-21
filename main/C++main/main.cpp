@@ -47,11 +47,19 @@ int main (int argc, char** argv) {
   S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
 
   for (int j = 0; j < components.size(); j ++) {
-    cout << j << " instance out of " << components.size() << endl;
     vector<vector<int> > adjacency_list;
     vector<int> f , w;
     get_input_from_component(j, components, adjacency_list, f, w);
-    //HCS(adjacency_list);  }/*
+    vector<vector<bool>> subgraphs = HCS(adjacency_list);
+    int sub = 0;
+    cout << subgraphs.size() << " clusters found" << endl;
+    for (auto v: subgraphs) {
+      cout << "Cluster " << sub ++ << " : ";
+      for (int i = 0; i < v.size(); i ++) {
+        if (v[i]) cout << i << " ";
+      }
+      cout << endl;
+    }
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0') continue;
       #ifdef FILE_S_CUTTER_INFO
@@ -61,7 +69,7 @@ int main (int argc, char** argv) {
       #endif
       // builds cplex model
       IloEnv env_pci;
-      PCI_solver pci_solver(env_pci, adjacency_list, f, w);
+      PCI_solver pci_solver(env_pci, adjacency_list, f, w, subgraphs);
       pci_solver.setModelProblem();
       pci_solver.setCplexSettings(TIMELIMIT);
       //vlDisp, vlEmph, alg, numThreads, vlGap, memory);

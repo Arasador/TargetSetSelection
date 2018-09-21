@@ -34,31 +34,46 @@ struct Graph {
       }
     }
 
-    Graph extract_subgraph(vector<bool>& selected_vertices) {
-      Graph res;
-      res.V = 0;
-      res.E = 0;
+    Graph extract_subgraph(int curr_component, vector<vector<bool>>& components) {
+      Graph new_graph;
+      new_graph.V = 0;
+      new_graph.E = 0;
       E = 0;
-      res.selected = selected_vertices;
-      for (int v = 0; v < selected_vertices.size(); v ++) {
-        if (selected_vertices[v]) {
-          res.V ++;
+      new_graph.selected = components.back();
+      for (int v = 0; v < new_graph.selected.size(); v ++) {
+        if (new_graph.selected[v]) {
+          new_graph.V ++;
           selected[v] = false; // taking this vertex off
+          components[curr_component][v] = false;
         }
       }
       vector<Edge> new_edges;
       for (auto edge: edges) {
-        if (selected_vertices[edge.src] && selected_vertices[edge.dest]) {
-          res.edges.push_back(edge);
-          res.E ++;
+        if (new_graph.selected[edge.src] && new_graph.selected[edge.dest]) {
+          new_graph.edges.push_back(edge);
+          new_graph.E ++;
         }
-        else if (! selected_vertices[edge.src] && ! selected_vertices[edge.dest]) {
+        // in case is selected in the curr graph
+        else if (selected[edge.src] && selected[edge.dest]) {
           new_edges.push_back(edge);
           E ++;
         }
       }
+      V -= new_graph.V;
+      cout << "old graph v " << V << " e " << E << " vertices ";
+      for (int i = 0; i < selected.size(); i ++) {
+        if (selected[i]) cout << i << " ";
+      }
+      cout << endl;
+
+      cout << "new graph v " << new_graph.V << " e " << new_graph.E << " vertices ";
+      for (int i = 0; i < selected.size(); i ++) {
+        if (new_graph.selected[i]) cout << i << " ";
+      }
+      cout << endl;
       edges = new_edges;
-      return res;
+      //exit(0);
+      return new_graph;
     } //*/
 };
 
@@ -106,7 +121,7 @@ int kargerMinCut(Graph& graph, vector<bool>& new_component) {
        assert(graph.selected[edge[i].src] && graph.selected[edge[i].dest]);
        int subset1 = Find(subsets, edge[i].src);
        int subset2 = Find(subsets, edge[i].dest);
-       cout << " sub 1 " << subset1 << "  sub2 " << subset2 << endl; 
+       //cout << " first sub  " << subset1 << " second sub " << subset2 << endl;
        // If two corners belong to same subset,
        // then no point considering this edge
        if (subset1 == subset2)
@@ -114,8 +129,8 @@ int kargerMinCut(Graph& graph, vector<bool>& new_component) {
        // Else contract the edge (or combine the
        // corners of edge into one vertex)
        else {
-          printf("Contracting edge %d-%d\n",
-                 edge[i].src, edge[i].dest);
+          //printf("Contracting edge %d-%d\n",
+                // edge[i].src, edge[i].dest);
           num_vertices --;
           Union(subsets, subset1, subset2);
        }
@@ -135,7 +150,7 @@ int kargerMinCut(Graph& graph, vector<bool>& new_component) {
     bool first = true;
     for (int v = 0; v < N; v ++) {
       if (graph.selected[v]) {
-        cout << v<<" subset" << Find(subsets, v) << endl;
+        cout << v<<" subset " << Find(subsets, v) << endl;
         if (first) {
           subset_compar = Find(subsets, v);
           first = false;
@@ -195,7 +210,7 @@ Graph createGraph(int V, int E) {
 
 // cluster algorithm called highly connected subgraphs
 void HCS_recursive (Graph& graph, int component, vector<vector<bool>>& components) {
-  if (graph.V <= 2) return;
+  if (graph.V <= 1) return;
   cout << "Component: ";
   int N = components[component].size();
   for (int i = 0; i < N; i ++) {
@@ -206,11 +221,24 @@ void HCS_recursive (Graph& graph, int component, vector<vector<bool>>& component
   int connectivity = kargerMinCut(graph, new_component);
   cout << "connectivity " << connectivity << endl;
   // this component is highly connected, so leave it alone
-  if (2 * connectivity >= N - 1) {
+  if (2 * connectivity >= graph.V ) {
     return;
   }
+
+  components.push_back(new_component);
+  Graph new_graph = graph.extract_subgraph(component, components);
+  cout << "components generated : " << endl;
   // otehrwise separates into 2 components by min cut
-  Graph new_graph = graph.extract_subgraph(new_component);
+
+
+  for (int i = 0; i < N; i ++) {
+    if (components[components.size() - 1][i]) cout << i << " ";
+  }
+  cout << endl;
+  for (int i = 0; i < N; i ++) {
+    if (components[component][i]) cout << i << " ";
+  }
+  cout << endl;
   HCS_recursive(graph, component, components);
   components.push_back(new_component);
   HCS_recursive(new_graph, components.size() - 1, components);
