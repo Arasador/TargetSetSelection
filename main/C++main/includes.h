@@ -38,7 +38,9 @@ typedef vector<vector<int> > vectorint2;
 typedef vector<vector<bool> > vectorbool2;
 //typedef vector<int>::iterator vector_it;
 
-#define TIMELIMIT 300
+#define TIMELIMIT 30000
 //#define PRINT_LOG
-#define FILE_S_CUTTER_INFO
-#define USERCUT
+//#define FILE_S_CUTTER_INFO
+//#define USERCUT
+#define EXCLUDE_SMALL_CLUSTERS
+#define MIN_SIZE_CLUSTER 3

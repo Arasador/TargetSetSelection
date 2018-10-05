@@ -27,6 +27,24 @@ void get_input_from_component(int i, deque<vector<vector<int>>>& components,
   adjacency_list.pop_back();
 }
 
+void add_root_relaxation_constraints(PCI_solver& pci_solver, vector<vector<int>>& lhs,
+  vector<int>& rhs) {
+  cout << "setting variables" << endl;
+  
+  cout << "variables setted" << endl;
+  //int count = 0;
+  while (true) {
+    cout << " try solving" << endl;
+    pci_solver.solveProblem();
+    if (! pci_solver.simulation_S_cutter(lhs, rhs)) {
+      cout << "break out" << endl;
+      break;
+    }
+    cout << "new constraint added!" << endl;
+  }
+}
+
+
 int main (int argc, char** argv) {
   // gets models selected from std input cmd line
   string model_selected = argv[1];
@@ -50,16 +68,7 @@ int main (int argc, char** argv) {
     vector<vector<int> > adjacency_list;
     vector<int> f , w;
     get_input_from_component(j, components, adjacency_list, f, w);
-    vector<vector<bool>> subgraphs = HCS(adjacency_list);
-    int sub = 0;
-    cout << subgraphs.size() << " clusters found" << endl;
-    for (auto v: subgraphs) {
-      cout << "Cluster " << sub ++ << " : ";
-      for (int i = 0; i < v.size(); i ++) {
-        if (v[i]) cout << i << " ";
-      }
-      cout << endl;
-    }
+
     for (int i = 0; i < NUM_MODELS; i ++) {
       if (model_selected[i] == '0') continue;
       #ifdef FILE_S_CUTTER_INFO
@@ -69,18 +78,35 @@ int main (int argc, char** argv) {
       #endif
       // builds cplex model
       IloEnv env_pci;
-      PCI_solver pci_solver(env_pci, adjacency_list, f, w, subgraphs);
+        cout << "starting pci solver" << endl;
+
+      PCI_solver pci_solver(env_pci, adjacency_list, f, w);
+        cout << "set model problem" << endl;
+      pci_solver.setModelVariables(true);
       pci_solver.setModelProblem();
+        cout << "set settings" << endl;
+
       pci_solver.setCplexSettings(TIMELIMIT);
       //vlDisp, vlEmph, alg, numThreads, vlGap, memory);
       try {
+        cout << "starting alg" << endl;
         pci_solver.startAlg(models[i]);
         //one_cut.enforceIntVars();
-        pci_solver.solveProblem();
+        vector<vector<int>> lhs;
+        vector<int> rhs;
+
+        add_root_relaxation_constraints(pci_solver, lhs, rhs);
+        pci_solver.reset_model();
+        pci_solver.setModelVariables(false);
+        pci_solver.setModelProblem();
+        pci_solver.setCplexSettings(TIMELIMIT);
+        pci_solver.startAlg(models[i]);
+        pci_solver.add_constraints(lhs, rhs);
+        pci_solver.solveProblem(); //*/
         pci_solver.endAlg(objective_values[i], times[i], gaps[i]);
         cout << "ended" << endl;
-
       } catch (IloException& ex) {
+        cout << "exception" << endl;
         pci_solver.Texception(objective_values[i], times[i], gaps[i]);
       }
     }

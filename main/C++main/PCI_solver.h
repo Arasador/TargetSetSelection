@@ -26,14 +26,19 @@ class PCI_solver {
   	IloObjective objective_function;
   	IloRangeArray constraints;
     // ----------------------methods
-    PCI_solver (IloEnv _env, vector<vector<int>> _adjacency_list, vector<int>
-      _f, vector<int> _w);
+    PCI_solver (IloEnv& _env, vector<vector<int>>& _adjacency_list, vector<int>&
+      _f, vector<int>& _w);
     ~PCI_solver ();
-    virtual int setModelProblem ();
-  	virtual int solveProblem ();
-    virtual IloExpr create_expression (vector<bool>);
+    void reset_model();
+    void setModelVariables(bool float_option);
+    void setModelProblem ();
+  	void solveProblem ();
+    IloExpr create_expression (vector<bool>);
     void setCplexSettings (int timelimit);
     void startAlg (model _model_chosen);
+    void add_constraints(vector<vector<int>>& lhs, vector<int>& rhs);
+    bool recursive_relax(vector<vector<int>>& lhs, vector<int>& rhs);
+    bool simulation_S_cutter(vector<vector<int>>& lhs, vector<int>& rhs);
     void endAlg (int &objective_value, double &times, double &gap);
     void Texception (int &objective_value, double &times, double &gap);
     void initial_constraints_v_infection (int initial_v);
@@ -41,8 +46,8 @@ class PCI_solver {
 };
 
 //--------------- Constructor
-PCI_solver::PCI_solver(IloEnv _env, vector<vector<int>> _adjacency_list,
-	vector<int> _f, vector<int> _w) {
+PCI_solver::PCI_solver(IloEnv& _env, vector<vector<int>>& _adjacency_list,
+	vector<int>& _f, vector<int>& _w) {
   // initializes cplex enviroment and model
   env = _env;
   c_model = IloModel(_env);
@@ -63,10 +68,17 @@ PCI_solver::PCI_solver(IloEnv _env, vector<vector<int>> _adjacency_list,
 	constraints_counter = 0;
 }
 
+
+
 PCI_solver::~PCI_solver () {
   cout << "pci destructor" << endl;
   delete s_cutter;
   delete separation;
+}
+
+void PCI_solver::reset_model() {
+  c_model = IloModel(env);
+  cplex = IloCplex(c_model);
 }
 
 IloExpr PCI_solver::create_expression (vector<bool> selected_var) {
@@ -79,13 +91,21 @@ IloExpr PCI_solver::create_expression (vector<bool> selected_var) {
   return expr;
 }
 
+void PCI_solver::setModelVariables(bool float_option) {
+  if (float_option) {
+    x = IloNumVarArray(env, N, 0.0, 1.0, ILOFLOAT);// ILOFLOAT 
+  } else {
+    x = IloNumVarArray(env, N, 0.0, 1.0, ILOINT);// ILOFLOAT 
+  }
+  _x = IloNumArray(env, N);
+}
+
+
 // sets model's initial constraints and objective function
-int PCI_solver::setModelProblem () {
+void PCI_solver::setModelProblem () {
   //x = IloNumVarArray(env);
   //constraints = IloRangeArray(env);
-  x = IloNumVarArray(env, N, 0.0, 1.0, ILOINT);
-  _x = IloNumArray(env, N);
-
+  
   constraints = IloRangeArray(env);
   char var_name[32];
 
@@ -115,15 +135,17 @@ int PCI_solver::setModelProblem () {
   //*/
 }
 
+
+
 // solving the problem after initial setup
-int PCI_solver::solveProblem () {
+void PCI_solver::solveProblem () {
   try {
     cplex.solve();
     cplex.getValues(_x, x);
+      //cout << _x << endl;
   } catch (IloException& ex) {
     cout << "solveProblem:" << ex << endl;
   }
-  return 0;
 }
 
 //93 sets all initial parameters
@@ -143,14 +165,158 @@ void PCI_solver::startAlg(model _model_chosen) {
 
 // what we need done by the end of the algorithm
 void PCI_solver::endAlg(int &objective_value, double &times, double &gap) {
+  
   cout << "Final obj value: " << cplex.getObjValue() << endl;
 	cout << "Final gap: " << cplex.getMIPRelativeGap() << endl;
 	cout << "Time: " << cplex.getTime() << endl;
+  /*
   cplex.exportModel ("lpex1.lp");
   objective_value += (int) round(cplex.getObjValue());
   gap = max(cplex.getMIPRelativeGap(), gap);
   times += cplex.getTime();
+  //*/
+    // Get the current x solution
+  /*IloNumArray xSol(env);
+  cplex.getValues(xSol, x);
+  vector<double> infected(N);
+  cout << N << endl;
+  for (int i = 0; i < N; i ++) {
+    infected[i] = xSol[i];
+    cout << i << ",   adj list (";
+    for (auto u: adjacency_list[i]) {
+      cout << u << ", ";
+    }
+
+    cout << "),   f " << f[i] << "    weight " << infected[i] << endl;
+    
+  }
+  cout << endl;
+  if (separation->finds_constraints(infected)) {
+    for (int i = 0; i < (separation->constraints_rhs_res).size(); i ++) {
+      for (int j = 0; j < (separation->constraints_lhs_res[i]).size(); j ++){
+        cout << " v[" << separation->constraints_lhs_res[i][j] << "] "<< infected[separation->constraints_lhs_res[i][j]] << " ";
+      }
+      cout << " > " << separation->constraints_rhs_res[i] << endl;
+    }
+  }
+    else {
+    cout << "No constraints" << endl;
+    } //*/
+
 }
+
+
+void PCI_solver::add_constraints(vector<vector<int>>& lhs, vector<int>& rhs) {
+  IloRangeArray c = IloRangeArray(env);
+  for (int i = 0; i < rhs.size(); i ++) {
+      constraints_counter ++;
+      IloExpr cutLhs(env);
+      for (int j = 0; j < lhs[i].size(); j ++) {
+        int k = lhs[i][j];
+        cutLhs += x[k];
+        //cout << k << endl;
+      }
+      //print_matrix(s_cutter->constraints_lhs_res, "added constraint: ");
+      IloRange ctrnt = cutLhs >= rhs[i];
+      //cout << ctrnt << endl;
+      //ctrnt.setName("#!!!!!!!!!!!!!!!!!!!!ADDED constraint");
+      c.add(ctrnt);
+
+    }
+    c_model.add(c);
+}
+
+
+bool PCI_solver::recursive_relax(vector<vector<int>>& lhs, vector<int>& rhs) {
+  cout << "Relaxed obj value: " << cplex.getObjValue() << endl;
+  //cout << "Final gap: " << cplex.getMIPRelativeGap() << endl;
+  //cout << "Time: " << cplex.getTime() << endl;
+  /*
+  cplex.exportModel ("lpex1.lp");
+  objective_value += (int) round(cplex.getObjValue());
+  gap = max(cplex.getMIPRelativeGap(), gap);
+  times += cplex.getTime();
+  //*/
+    // Get the current x solution
+  IloNumArray xSol(env);
+  cplex.getValues(xSol, x);
+  vector<double> infected(N);
+  //cout << N << endl;
+  for (int i = 0; i < N; i ++) {
+    infected[i] = xSol[i];
+    /*cout << i << ",   adj list (";
+    for (auto u: adjacency_list[i]) {
+      cout << u << ", ";
+    }
+
+    cout << "),   f " << f[i] << "    weight " << infected[i] << endl; //*/
+  }
+  //cout << endl;
+
+  if (separation->finds_constraints(infected)) {
+    for (int i = 0; i < (separation->constraints_rhs_res).size(); i ++) {
+      lhs.push_back(separation->constraints_lhs_res[i]);
+      rhs.push_back(separation->constraints_rhs_res[i]);
+      for (int j = 0; j < (separation->constraints_lhs_res[i]).size(); j ++){
+        cout << " v[" << separation->constraints_lhs_res[i][j] << "] "<< 
+        infected[separation->constraints_lhs_res[i][j]] << " ";
+      }
+      cout << " > " << separation->constraints_rhs_res[i] << endl;
+    }
+    //IloRangeArray c = IloRangeArray(env);
+    constraints = IloRangeArray(env);
+
+      // Objective function
+      
+     //expr_obj_fun.end();
+
+      // first constraint
+    add_constraints(separation->constraints_lhs_res, separation->constraints_rhs_res);
+    return true;
+  }
+  cout << "No constraints" << endl;
+  return false;
+}
+
+
+bool PCI_solver::simulation_S_cutter(vector<vector<int>>& lhs, vector<int>& rhs) {
+  cout << "Relaxed obj value: " << cplex.getObjValue() << endl;
+  vector<bool> infected(N);
+  //cout << N << endl;
+  for (int i = 0; i < N; i ++) {
+    int val = ceil(_x[i] - 0.01);
+    assert(val <= 1 && val >= 0);
+    infected[i] = (bool) val;
+    //assert(infected[i] <= 1 && infected[i] >= 0);
+  }
+  if (s_cutter->finds_constraints(infected, model_chosen)) {
+      // if found better upper bounds, updates ub and ub_vertices
+    for (int i = 0; i < (s_cutter->constraints_rhs_res).size(); i ++) {
+
+      lhs.push_back(s_cutter->constraints_lhs_res[i]);
+      rhs.push_back(s_cutter->constraints_rhs_res[i]);
+      
+      for (int j = 0; j < (s_cutter->constraints_lhs_res[i]).size(); j ++){
+        cout << " v[" << s_cutter->constraints_lhs_res[i][j] << "] "<< 
+        infected[s_cutter->constraints_lhs_res[i][j]] << " ";
+      }
+      cout << " > " << s_cutter->constraints_rhs_res[i] << endl;
+    }
+    //IloRangeArray c = IloRangeArray(env);
+    constraints = IloRangeArray(env);
+
+      // Objective function
+      
+     //expr_obj_fun.end();
+
+      // first constraint
+    add_constraints(s_cutter->constraints_lhs_res, s_cutter->constraints_rhs_res);
+    return true;
+  }
+  cout << "No constraints" << endl;
+  return false;
+}
+
 
 // exception
 void PCI_solver::Texception(int &objective_value, double &times, double &gap) {
@@ -168,7 +334,6 @@ void PCI_solver::Texception(int &objective_value, double &times, double &gap) {
   gap = 0;
   times += cplex.getTime();
 }
-
 
 
 // added initial constraints v, so starts with a more robust model
@@ -317,7 +482,6 @@ ILOUSERCUTCALLBACK1(userCallback, PCI_solver&, obj) {
       for (auto e: infected) outfile << e << " ";
       outfile << "\n";
     #endif
-    cout << "entered" << endl;
     // if found better upper bounds, updates ub and ub_vertices
 		for (int i = 0; i < (separation->constraints_rhs_res).size(); i ++) {
 			IloExpr cutLhs(masterEnv);
@@ -352,7 +516,7 @@ void PCI_solver::setCplexSettings(int timelimit) {
     cplex.use(userCallback(env, *this));
   #endif
   cplex.use(lazyCallback(env, *this));
-  cplex.setParam(IloCplex::TiLim, timelimit);
+  //cplex.setParam(IloCplex::TiLim, timelimit);
   cplex.setParam(IloCplex::RandomSeed, 31415);
   cplex.setOut(env.getNullStream());
   // mip enphasis 3: CPX_MIPEMPHASIS_BESTBOUND  Emphasize moving best bound

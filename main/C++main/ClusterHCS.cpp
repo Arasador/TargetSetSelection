@@ -13,14 +13,14 @@ struct Edge {
 
 // a structure to represent a connected, undirected
 // and unweighted graph as a collection of edges.
-struct Graph {
+struct SimpleGraph {
     int V, E;
     vector<Edge> edges;
     vector<bool> selected;
 
-    Graph() {}
+    SimpleGraph() {}
 
-    Graph(const vector<vector<int>>& adjacency_list){
+    SimpleGraph(const vector<vector<int>>& adjacency_list){
       V = adjacency_list.size();
       E = 0;
       selected = vector<bool>(V, true);
@@ -34,17 +34,17 @@ struct Graph {
       }
     }
 
-    Graph extract_subgraph(int curr_component, vector<vector<bool>>& components) {
-      Graph new_graph;
+    SimpleGraph extract_subgraph(vector<bool>& component) {
+      SimpleGraph new_graph;
       new_graph.V = 0;
       new_graph.E = 0;
       E = 0;
-      new_graph.selected = components.back();
+      new_graph.selected = component;
       for (int v = 0; v < new_graph.selected.size(); v ++) {
         if (new_graph.selected[v]) {
           new_graph.V ++;
           selected[v] = false; // taking this vertex off
-          components[curr_component][v] = false;
+          //components[curr_component][v] = false;
         }
       }
       vector<Edge> new_edges;
@@ -60,21 +60,9 @@ struct Graph {
         }
       }
       V -= new_graph.V;
-      cout << "old graph v " << V << " e " << E << " vertices ";
-      for (int i = 0; i < selected.size(); i ++) {
-        if (selected[i]) cout << i << " ";
-      }
-      cout << endl;
-
-      cout << "new graph v " << new_graph.V << " e " << new_graph.E << " vertices ";
-      for (int i = 0; i < selected.size(); i ++) {
-        if (new_graph.selected[i]) cout << i << " ";
-      }
-      cout << endl;
       edges = new_edges;
-      //exit(0);
       return new_graph;
-    } //*/
+    }
 };
 
 // A structure to represent a subset for union-Find
@@ -93,7 +81,7 @@ void Union(vector<subset>&, int, int);
 // that Karger's algorithm is a Monte Carlo Randomized algo
 // and the cut returned by the algorithm may not be
 // minimum always
-int kargerMinCut(Graph& graph, vector<bool>& new_component) {
+int kargerMinCut(SimpleGraph& graph, vector<bool>& new_component) {
     // Get data of given graph
     int V = graph.V, E = graph.E, N = graph.selected.size();
     vector<Edge>& edge = graph.edges;
@@ -150,14 +138,13 @@ int kargerMinCut(Graph& graph, vector<bool>& new_component) {
     bool first = true;
     for (int v = 0; v < N; v ++) {
       if (graph.selected[v]) {
-        cout << v<<" subset " << Find(subsets, v) << endl;
+        //cout << v<<" subset " << Find(subsets, v) << endl;
         if (first) {
           subset_compar = Find(subsets, v);
           first = false;
         } else {
           if (subset_compar != Find(subsets, v)) {
             new_component[v] = true;
-            graph.selected[v] = false;
           }
         }
       }
@@ -178,8 +165,7 @@ int Find(vector<subset>& subsets, int i) {
 
 // A function that does union of two sets of x and y
 // (uses union by rank)
-void Union(vector<subset>& subsets, int x, int y)
-{
+void Union(vector<subset>& subsets, int x, int y) {
     int xroot = Find(subsets, x);
     int yroot = Find(subsets, y);
 
@@ -199,8 +185,8 @@ void Union(vector<subset>& subsets, int x, int y)
 }
 
 // Creates a graph with V vertices and E edges
-Graph createGraph(int V, int E) {
-    Graph graph = Graph();
+SimpleGraph createGraph(int V, int E) {
+    SimpleGraph graph = SimpleGraph();
     graph.V = V;
     graph.E = E;
     graph.edges = vector<Edge>(E);
@@ -209,51 +195,76 @@ Graph createGraph(int V, int E) {
 }
 
 // cluster algorithm called highly connected subgraphs
-void HCS_recursive (Graph& graph, int component, vector<vector<bool>>& components) {
+void HCS_recursive (SimpleGraph& graph, vector<vector<bool>>& components) {
   if (graph.V <= 1) return;
-  cout << "Component: ";
-  int N = components[component].size();
-  for (int i = 0; i < N; i ++) {
-    if (graph.selected[i]) cout << i << " ";
+  //cout << "Component: ";
+  int N = graph.selected.size();
+  /*for (int i = 0; i < N; i ++) {
+    if (graph.selected[i]) //cout << i << " ";
   }
-  cout << endl;
+  cout << endl; //*/
   vector<bool> new_component;
   int connectivity = kargerMinCut(graph, new_component);
-  cout << "connectivity " << connectivity << endl;
+  //cout << "connectivity " << connectivity << endl;
   // this component is highly connected, so leave it alone
   if (2 * connectivity >= graph.V ) {
+    components.push_back(graph.selected);
     return;
   }
 
-  components.push_back(new_component);
-  Graph new_graph = graph.extract_subgraph(component, components);
-  cout << "components generated : " << endl;
-  // otehrwise separates into 2 components by min cut
-
+  vector<bool> prev_selected = graph.selected;
+  SimpleGraph new_graph = graph.extract_subgraph(new_component);
 
   for (int i = 0; i < N; i ++) {
-    if (components[components.size() - 1][i]) cout << i << " ";
+    if (prev_selected[i] && ! graph.selected[i] && ! new_graph.selected[i]) {
+      cout << "lost one vertex" << endl;
+      exit(1);
+    }
+    if (graph.selected[i] && new_graph.selected[i]) {
+      cout << "repeated in recursion " << i << endl;
+      exit(1);
+    }
   }
-  cout << endl;
-  for (int i = 0; i < N; i ++) {
-    if (components[component][i]) cout << i << " ";
-  }
-  cout << endl;
-  HCS_recursive(graph, component, components);
-  components.push_back(new_component);
-  HCS_recursive(new_graph, components.size() - 1, components);
+
+  HCS_recursive(graph, components);
+  HCS_recursive(new_graph, components);
 }
 
 
 vector<vector<bool>> HCS(const vector<vector<int>>& adjacency_list) {
-  Graph graph = Graph(adjacency_list);
-  for (auto edge: graph.edges) {
+  SimpleGraph graph = SimpleGraph(adjacency_list);
+  /*for (auto edge: graph.edges) {
     cout << edge.src << " - " << edge.dest << " ,  ";
   }
-  cout << endl;
+  cout << endl; //*/
   vector<vector<bool>> components;
-  components.push_back(vector<bool>(graph.V, true));
-  HCS_recursive(graph, 0, components);
+  HCS_recursive(graph, components);
+
+  #ifdef EXCLUDE_SMALL_CLUSTERS
+    vector<vector<bool>> compressed_clusters;
+    vector<bool> repeated(components[0].size(), false);
+    int empty_clusters = 0;
+    for (auto& cluster: components) {
+      int counter = 0;
+      for (int i = 0; i < cluster.size(); i ++){
+        if (cluster[i]) {
+          if (repeated[i]) {
+            cout << "repeated vertex in cluster " << i << endl;
+            exit(0);
+          }
+          repeated[i] = true;
+          counter ++;
+        }
+      }
+      if (counter == 0) empty_clusters ++;
+      if (counter >= MIN_SIZE_CLUSTER)
+        compressed_clusters.push_back(cluster);
+    }
+    cout << "Reduced num clusters from " << components.size() << " to " <<
+      compressed_clusters.size() << endl;
+      cout << "empty " << empty_clusters << endl;
+    return compressed_clusters;
+  #endif
   return components;
 }
 
@@ -269,7 +280,7 @@ vector<vector<bool>> HCS(const vector<vector<int>>& adjacency_list) {
         2------3
     int V = 4;  // Number of vertices in graph
     int E = 5;  // Number of edges in graph //
-    Graph graph = createGraph(V, E);
+    SimpleGraph graph = createSimpleGraph(V, E);
 
     // add edge 0-1
     graph.edges[0].src = 0;
