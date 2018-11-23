@@ -4,6 +4,8 @@
   a new valid restriction, cutting the solution space, 
   If no such cut can be found, the optimal solution was found
 **/
+#ifndef SCUTTER
+#define SCUTTER
 
 #include "includes.h"
 #include <vector>
@@ -103,3 +105,4 @@ class S_cutter {
     vector<bool>& infected, vector<int>& new_f, vector<int>& selection_order, 
     int& position, model model_chosen); 
 };
+#endif

@@ -10,14 +10,14 @@ CNRTARGS = -lconcert -lpthread
 
 #objects = preprocessing.o s_cutter.o separation.o pci_solver.o
 
-#pci_test: preprocessing.o pci_solver.o
-#	$(CPP) $(CARGS) $(CPLXINC) $(CNCRTINC) \
-#	-std=c++11 -o pci_test preprocessing.o pci_solver.o  s_cutter.o separation.o main.cpp \
-#	$(CNCRTLIB) $(CNRTARGS) $(CPLXLIB) $(CPLXARGS)
-
-pci_solver.o: s_cutter.o separation.o
+pci_test: preprocessing.o pci_solver.o
 	$(CPP) $(CARGS) $(CPLXINC) $(CNCRTINC) \
-	-o -c pci_solver.o PCI_solver.cpp \
+	-std=c++11 -o pci_test preprocessing.o pci_solver.o  s_cutter.o separation.o main.cpp \
+	$(CNCRTLIB) $(CNRTARGS) $(CPLXLIB) $(CPLXARGS)
+
+pci_solver.o: s_cutter.o separation.o includes.h
+	$(CPP) $(CARGS) $(CPLXINC) $(CNCRTINC) \
+	-c -o pci_solver.o PCI_solver.cpp \
 	$(CNCRTLIB) $(CNRTARGS) $(CPLXLIB) $(CPLXARGS)
 
 preprocessing.o: preprocessing.cpp preprocessing.h

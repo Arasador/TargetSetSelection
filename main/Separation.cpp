@@ -2,7 +2,6 @@
 #include "S_cutter.h"
 #include "ClusterHCS.cpp"
 
-
 Separation::Separation(vector<vector<int>> _adjacency_list,
 	vector<int> _f, vector<int> _w) {
 	adjacency_list = _adjacency_list;

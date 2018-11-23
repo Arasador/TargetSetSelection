@@ -1,3 +1,5 @@
+#ifndef INCLUDES
+#define INCLUDES
 /*#include <assert.h>
 #include <iostream>
 #include <vector>
@@ -23,7 +25,6 @@ using namespace std;
 #define S_SMALLER_H2 7
 // #define S_SMALLER_NEW 8 */
 //#define INFECTED -2
-#define INCLUDE
 
 enum removals { REMOVED = -1, INFECTED = -2, DEGREE_ONE_REMOVAL = -3, FREE = 0};
 
@@ -31,17 +32,19 @@ enum model {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
   S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
 
 // list of all models we have
-  model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
-  S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
+
 
 
 #define TIMELIMIT 180000
 //#define PRINT_LOG
 //#define FILE_S_CUTTER_INFO
-#define ROOT_RELAX
+//#define ROOT_RELAX
 #define UPPERBOUND_CUT
-#define USERCUT
+//#define USERCUT
 #define EXCLUDE_SMALL_CLUSTERS
 #define MIN_SIZE_CLUSTER 3
-//#define CONSIDER_WEIGHTS
+#define CONSIDER_WEIGHTS
 #define CONSIDER_F_RANDOM
+//#define REDUCTION_SWAP
+
+#endif

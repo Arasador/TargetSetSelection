@@ -4,8 +4,9 @@
 *.dat
 *.txt
 #Ignores makefile, since it difers from machine to machine
-main/C++main/makefile
+main/makefile
 *.lp
+*.o
 
-main/C++main/pci_test
+main/pci_test
 ToDoList.txt~

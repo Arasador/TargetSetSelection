@@ -4,13 +4,15 @@
   to the instance, which may generate a new graph and separated graph components,
   each component a new instance.
 **/
-
+#ifndef PREPROCESSING
+#define PREPROCESSING
 
 #include <string>
 #include <deque>
 #include <vector>
 
 #include "includes.h"
+
 
 //enum removals { REMOVED = -1, INFECTED = -2, DEGREE_ONE_REMOVAL = -3, FREE = 0};
 
@@ -48,3 +50,5 @@ separate_in_connected_instances(vector<vector<int>> &adjacency_list,
   vector<int> &f, vector<int> &w);
 
 deque<vector<vector<int>>> data_preprocessing(int argc, char* argv[]);
+
+#endif  

@@ -64,8 +64,8 @@ int main (int argc, char** argv) {
     outfile.close();
   #endif
   // list of all models we have
-  //model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
-  //S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
+  model models[] = {S_MODEL, S_SMALLER, WS_SMALLER, DOMINATED, WDOMINATED,
+  S_SMALLER_H1, S_SMALLER_H2, S_SMALLER_NEW};
 
   for (int j = 0; j < components.size(); j ++) {
     vector<vector<int> > adjacency_list;

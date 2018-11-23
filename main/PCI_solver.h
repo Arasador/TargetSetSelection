@@ -1,9 +1,10 @@
-
 /**
   PCI_solver.h
   Given an instance and a problem, using cplex api, solves the instance for and initial
   
 **/
+#ifndef PCISOLVER
+#define PCISOLVER
 
 #include <ilcplex/ilocplex.h>
 #include <vector>
@@ -12,7 +13,6 @@
 
 using namespace std;
  
-
 class PCI_solver {
   public:
 		//bool rlModel;
@@ -32,6 +32,7 @@ class PCI_solver {
     Separation* separation;
 
     vector<bool> ub_vertices;
+    vector<bool> active;
     int ub;
     IloExpr expr_obj_fun;
   	IloObjective objective_function;
@@ -43,6 +44,7 @@ class PCI_solver {
     void reset_model();
     void setModelVariables(bool float_option);
     void setModelProblem (bool upper_bound = false);
+    void reduction_neighbors();
   	void solveProblem ();
     IloExpr create_expression (vector<bool>);
     void setCplexSettings (int timelimit);
@@ -57,3 +59,4 @@ class PCI_solver {
     void add_initial_constraints_neighbors();
 };
 
+#endif

@@ -1,3 +1,6 @@
+#ifndef SEPARATION
+#define SEPARATION
+
 #include <iostream>
 #include <algorithm>
 #include <vector>
@@ -39,3 +42,4 @@ public:
 	bool finds_constraints_COMBINATIONS(vector<double> infected);
 	bool finds_constraints_HEURISTIC(vector<double> infected);
 };
+#endif

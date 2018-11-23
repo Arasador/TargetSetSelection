@@ -1,7 +1,6 @@
 
 #include "PCI_solver.h"
 
-
 //--------------- Constructor
 PCI_solver::PCI_solver(IloEnv& _env, vector<vector<int>>& _adjacency_list,
 	vector<int>& _f, vector<int>& _w) {
@@ -18,6 +17,7 @@ PCI_solver::PCI_solver(IloEnv& _env, vector<vector<int>>& _adjacency_list,
 
   N = f.size();
   ub_vertices = vector<bool>(N, true);
+  active = vector<bool>(N, true);
   ub = 0;
   for (auto weight: w) ub += weight;
   lazycall_counter = 0;
@@ -87,6 +87,11 @@ void PCI_solver::setModelProblem (bool upper_bound) {
   ctrnt.setName("#1_constraint_fmin");
   constraints.add(ctrnt);
 
+  // adds reduction 4: if a vertex can be swaped with neighbors that will cost less
+  // swap it
+  #ifdef REDUCTION_SWAP
+  reduction_neighbors();
+  #endif 
 	// adds n constraints using s, and initial v = 0
   //initial_constraints_v_infection(0);
   add_initial_constraints_neighbors();
@@ -95,6 +100,40 @@ void PCI_solver::setModelProblem (bool upper_bound) {
 	// to see the model we created
   //*/
 }
+
+
+struct VertexWeight {
+  int v, w;
+};
+
+bool compare_vertices(VertexWeight& v1, VertexWeight& v2) {
+  return v1.w < v2.w;
+}
+
+int get_min_k_sum(int k, vector<int>& w, vector<int>& vertices) {
+  vector<VertexWeight> list(vertices.size());
+  for (int i = 0; i < vertices.size(); i ++) {
+    list[i] = {vertices[i], w[vertices[i]]};
+  }
+  sort(list.begin(), list.end(), compare_vertices);
+  int sum_k_mins = 0;
+  for (int i = 0 ; i < k; i ++) {
+    sum_k_mins += list[i].w;
+  }
+  return sum_k_mins;
+}
+
+void PCI_solver::reduction_neighbors() {
+  for (int v = 0; v < N; v ++) {
+    int sum = get_min_k_sum(f[v], w, adjacency_list[v]);
+    if (sum < w[v])  { // it is not <= because can generate loops, analyse after
+      active[v] = false;
+      constraints.add(x[v] == 0); 
+    }
+  }
+}
+
+
 
 // solving the problem after initial setup
 void PCI_solver::solveProblem () {
